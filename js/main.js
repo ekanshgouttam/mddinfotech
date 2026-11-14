@@ -1,4 +1,4 @@
-import { Engine } from './engine.js';
+import { Engine, Circuit } from './engine.js';
 import { Lab } from './lab.js';
 
 const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -19,26 +19,31 @@ function progress(section) {
 /* ---------- The machine room (everything behind the dark sections) ---------- */
 const engine = new Engine($('#engine'));
 
-const mouse = { x: -1e4, y: -1e4 };
-addEventListener('pointermove', (e) => { mouse.x = e.clientX; mouse.y = e.clientY; }, { passive: true });
+const mouse = { x: -1e4, y: -1e4, t: -1e4 };
+addEventListener('pointermove', (e) => {
+  if (e.pointerType !== 'mouse') return; // touch steers nothing; a tap starts branches instead
+  mouse.x = e.clientX; mouse.y = e.clientY; mouse.t = performance.now();
+}, { passive: true });
 
-// Click (or tap) on a machine: it spins up and sends out a pulse.
-const machinesNow = {};
-const ping = { id: '', start: -1e9 };
-const machineAt = (x, y) => Object.keys(machinesNow).find((id) => {
-  const m = machinesNow[id];
-  return m && Math.hypot(x - m.x, y - m.y) < m.r;
-});
-function triggerPing(e) {
-  if (e.target.closest('a, button')) return;
-  const id = machineAt(e.clientX, e.clientY);
-  if (id) { ping.id = id; ping.start = performance.now(); }
+/* ---------- Hero: a circuit board routing itself around the headline, then printed into the lab ---------- */
+const hero = { sec: $('#hero'), stage: $('#hero .stage'), copy: $('.hero-copy'), ui: $('.hero-ui'), circuit: new Circuit(), p: 0, w: 0, h: 0 };
+function layoutHero() {
+  const st = rect(hero.stage), W = st.width, H = st.height;
+  if (W === hero.w && H === hero.h) return; // phones resize as the address bar moves; the board stays
+  hero.w = W; hero.h = H;
+  const local = (el, m) => { const b = rect(el); return { x: b.left - st.left - m, y: b.top - st.top - m, w: b.width + 2 * m, h: b.height + 2 * m }; };
+  const lines = $$('.hero-title .l');
+  const keep = [...lines, $('.hero-h1'), $('.hero-lede'), $('.hero-hint')].map((el) => local(el, 14));
+  const top = rect($('.nav')).height + 4;
+  keep.push({ x: 0, y: -8, w: W, h: top + 8 }); // under the header
+  const phone = W <= 680, r = phone ? 20 : 28, reach = r * 1.4 + 24; // the chip, its pins and a little air
+  const copyTop = local(hero.copy, 0).y, titleRight = Math.max(...lines.map((el) => { const b = local(el, 0); return b.x + b.w; }));
+  // The chip sits in open space: right of the headline on wide screens, above the copy on narrow ones
+  let x = W * 0.74, y = H * 0.42;
+  if (x - reach < titleRight + 40) { x = W * (phone ? 0.64 : 0.7); y = top + (copyTop - top) / 2; }
+  hero.circuit.layout(W, H, 8, keep, { x, y, r }, engine.dpr);
+  if (powerAt >= 0 || reduce) hero.circuit.finish(); // after the opening, a new layout appears fully grown
 }
-$('#hero').addEventListener('click', triggerPing);
-$('#contact').addEventListener('click', triggerPing);
-
-/* ---------- Hero: the growth engine, then the dive into its core ---------- */
-const hero = { sec: $('#hero'), stage: $('#hero .stage'), anchor: $('#hero .core-anchor'), ui: $('.hero-ui'), p: 0 };
 function updateHero() {
   const box = rect(hero.sec);
   if (!onScreen(box)) return { visible: false, white: 0 };
@@ -46,18 +51,17 @@ function updateHero() {
   const p = hero.p;
   hero.ui.style.opacity = 1 - clamp(p / 0.16);
   hero.ui.style.visibility = p > 0.16 ? 'hidden' : '';
-
-  const a = rect(hero.anchor);
-  let x = a.left + a.width / 2, y = a.top + a.height / 2, r = a.width / 2;
-  const z = reduce ? 0 : clamp((p - 0.16) / 0.62);
-  const toCentre = smooth(clamp(z * 1.6));
-  x += (innerWidth / 2 - x) * toCentre;
-  y += (innerHeight / 2 - y) * toCentre;
-  r *= 30 ** (z * z);
-  const white = reduce ? smooth(clamp((p - 0.4) / 0.35)) : smooth(clamp((z - 0.6) / 0.34));
-  hero.stage.classList.toggle('near-core', p < 0.16 && Math.hypot(mouse.x - x, mouse.y - y) < r);
-  return { visible: true, x, y, r, white };
+  const wave = clamp((p - 0.14) / 0.64) * 1.15; // white tiles fill the grid and print the board into the lab
+  const st = rect(hero.stage);
+  return { visible: true, x: st.left, y: st.top, w: st.width, h: st.height, wave, white: clamp(wave / 1.15) };
 }
+// A click (or tap) on the board starts new branches from the nearest traces
+addEventListener('click', (e) => {
+  if (powerAt < 0 || reduce || hero.p > 0.12 || e.target.closest('a, button, summary, .map')) return;
+  const st = rect(hero.stage);
+  if (e.clientY < st.top || e.clientY > st.bottom) return;
+  hero.circuit.branchAt(e.clientX - st.left, e.clientY - st.top);
+});
 
 /* ---------- The lab: services as live diagrams ---------- */
 const lab = {
@@ -172,11 +176,33 @@ function updateProcess() {
   proc.steps.forEach((el, i) => el.classList.toggle('is-reached', L >= proc.marks[i] - 2));
 }
 
-/* ---------- Contact: the engine again, smaller ---------- */
-const farAnchor = $('.core-far');
-function contactMachine() {
-  const a = rect(farAnchor);
-  return onScreen(a, a.width) ? { x: a.left + a.width / 2, y: a.top + a.height / 2, r: a.width / 2 } : null;
+/* ---------- Contact: the logo's disc, drawn as a specification the first time it comes into view ---------- */
+const mark = { anchor: $('.panel-anchor'), born: -1 };
+function contactMark(now) {
+  const a = rect(mark.anchor);
+  if (!onScreen(a, a.height)) return null;
+  if (mark.born < 0 && powerAt >= 0 && a.top < innerHeight * 0.85) mark.born = now;
+  const k = reduce ? 1 : mark.born < 0 ? 0 : clamp((now - mark.born) / 1800);
+  return { x: a.left + a.width / 2, y: a.top + a.height * 0.42, r: Math.min(a.width, a.height) * 0.28, k };
+}
+
+/* ---------- The page prints itself as you read: each block is swept in when it first appears ---------- */
+const prints = reduce ? [] : $$('.hero-title .l, .audience .kicker, .audience-statement, .audience-cols > div, .process .kicker, .faq .kicker, .qa, .contact > :not(.panel-anchor), .credits > *');
+prints.forEach((el) => el.classList.add('gen'));
+function startPrinting() {
+  if (!prints.length) return;
+  const io = new IntersectionObserver((entries) => {
+    let k = 0; // blocks that appear together print one after another
+    for (const e of entries) {
+      if (!e.isIntersecting) continue;
+      const el = e.target, delay = k++ * 110;
+      io.unobserve(el);
+      el.style.setProperty('--d', `${delay}ms`);
+      el.classList.add('is-printed');
+      setTimeout(() => el.classList.add('is-done'), delay + 1000);
+    }
+  }, { rootMargin: '0px 0px -6% 0px' });
+  prints.forEach((el) => io.observe(el));
 }
 
 /* ---------- Navigation: the core shows where you are and opens a map of the site ---------- */
@@ -298,7 +324,7 @@ addEventListener('keydown', (e) => {
 });
 
 /* ---------- Frame loop ---------- */
-let powerAt = -1, last = performance.now();
+let powerAt = -1, last = 0;
 
 function frame(now) {
   tick(now);
@@ -306,37 +332,33 @@ function frame(now) {
 }
 
 function tick(now) {
-  const dt = Math.min(0.05, (now - last) / 1000);
+  const dt = Math.min(0.1, (now - (last || now)) / 1000);
   last = now;
   const h = updateHero();
   const l = updateLab(now);
   const models = updateWork();
   updateProcess();
   updateNav();
-  const c = contactMachine();
 
-  machinesNow.hero = h.visible ? { x: h.x, y: h.y, r: h.r } : null;
-  machinesNow.contact = c;
   body.classList.toggle('on-light', (h.visible && h.white > 0.5) || l.light);
   body.style.setProperty('--nav-shade', h.visible ? (1 - clamp(h.white * 2)).toFixed(3) : '1');
   if (l.covers) return; // the lab hides the machine room completely
 
-  const intro = reduce ? 1 : powerAt < 0 ? 0 : clamp((now - powerAt) / 1800);
-  const age = (id) => (ping.id === id ? (now - ping.start) / 1000 : -1);
-  const machines = [];
-  if (h.visible) machines.push({ id: 'hero', ...machinesNow.hero, amt: 1, intro, white: h.white, pingAge: age('hero') });
-  if (c) machines.push({ id: 'contact', ...c, amt: 1, intro: 1, white: 0, pingAge: age('contact') });
+  if (h.visible && powerAt >= 0 && !reduce) {
+    const over = mouse.y > h.y && mouse.y < h.y + h.h;
+    hero.circuit.update(dt, over ? { x: mouse.x - h.x, y: mouse.y - h.y, active: now - mouse.t < 400 } : null);
+  }
   engine.render({
-    time: reduce ? 20 : now / 1000,
-    dt: reduce ? 0 : dt,
-    white: h.visible ? h.white : 0,
-    gridShift: scrollY * 0.5,
-    mouse, machines, models,
+    time: reduce ? 20 : now / 1000, dt, scroll: scrollY, still: reduce, rule: powerAt >= 0, models,
+    circuit: h.visible ? { c: hero.circuit, x: h.x, y: h.y } : null,
+    wave: h.visible && h.wave > 0 ? { k: h.wave, x: h.x, y: h.y, w: h.w, h: h.h } : null,
+    mark: contactMark(now),
   });
 }
 
 function resize() {
   engine.resize();
+  layoutHero();
   labView.resize();
   buildRoute();
   buildDial();
@@ -345,16 +367,49 @@ function resize() {
 let resizeTimer = 0;
 addEventListener('resize', () => { clearTimeout(resizeTimer); resizeTimer = setTimeout(resize, 150); });
 
-/* ---------- Opening: the engine powers on ---------- */
+/* ---------- Opening: the loader powers up, its disc drops onto the board as the chip, the board grows ---------- */
+const loader = $('.loader');
+
+// The dial fills as the page gets ready, never faster than 0.9 s; resolves at 100%
+function load(ready) {
+  return new Promise((done) => {
+    const pct = $('.loader-pct', loader), fill = $('.ld-fill', loader), LEN = 2 * Math.PI * 56, t0 = performance.now();
+    let ok = false, shown = 0;
+    ready.then(() => (ok = true));
+    const iv = setInterval(() => {
+      const t = performance.now() - t0;
+      const goal = Math.min(ok ? 100 : 30 + 55 * (1 - Math.exp(-t / 900)), t / 9);
+      shown += (goal - shown) * 0.3;
+      if (goal === 100 && shown > 99.5) shown = 100;
+      pct.textContent = Math.round(shown);
+      fill.style.strokeDashoffset = (LEN * (1 - shown / 100)).toFixed(1);
+      if (shown === 100) { clearInterval(iv); done(); }
+    }, 30);
+  });
+}
+
+function power() {
+  powerAt = performance.now();
+  hero.circuit.lit = true;
+  body.classList.add('is-ready');
+  startPrinting();
+  setTimeout(() => body.classList.add('is-settled'), 2600);
+}
+
 async function start() {
-  await Promise.race([document.fonts.ready, new Promise((r) => setTimeout(r, 2500))]);
-  resize();
-  requestAnimationFrame(frame);
-  const go = () => {
-    powerAt = performance.now();
-    body.classList.add('is-ready');
-    setTimeout(() => body.classList.add('is-settled'), 2600);
-  };
-  if (reduce) go(); else setTimeout(go, 500);
+  const ready = Promise.race([document.fonts.ready, new Promise((r) => setTimeout(r, 2500))]).then(() => {
+    resize();
+    requestAnimationFrame(frame);
+  });
+  if (!loader || reduce) { await ready; loader?.remove(); power(); return; }
+  await load(ready);
+  // the disc travels to the chip on the board and becomes its die
+  const disc = $('.loader-disc', loader), d = rect(disc), st = rect(hero.stage), c = hero.circuit.chip;
+  const tx = st.left + c.x, ty = st.top + c.y;
+  if (ty > 0 && ty < innerHeight) disc.style.transform = `translate(${tx - (d.left + d.width / 2)}px, ${ty - (d.top + d.height / 2)}px) scale(${(2 * c.rad) / d.width})`;
+  else disc.style.opacity = 0; // the page opened further down: no chip to land on
+  loader.classList.add('is-leaving');
+  setTimeout(power, 750);
+  setTimeout(() => loader.remove(), 1400);
 }
 start();

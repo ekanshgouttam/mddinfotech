@@ -1,18 +1,14 @@
-// The machine room: a full-screen 2D canvas behind the dark sections. It draws a blueprint grid,
-// the growth engine (the logo's orange disc as its core) and the project models, all as
-// precise line drawings in the same language as the services lab.
+// The machine room: a full-screen 2D canvas behind the dark sections. It draws a blueprint grid that
+// is ruled as you read, the circuit growing in the hero, the logo-disc spec on the contact section and
+// the project models, in the same precise language as the services lab.
 
 const BG = [7, 11, 20];          // #070B14
-const LAB = [241, 243, 246];     // #F1F3F6, the lab
 const LINE = '205, 216, 240';    // pale line colour (rgb, alpha added per use)
-const BLUE = '123, 147, 255';    // logo blue, lifted for dark
 const ORANGE = '223, 104, 38';   // logo orange
 
 const TAU = Math.PI * 2;
 const clamp = (v, a = 0, b = 1) => Math.min(b, Math.max(a, v));
 const ease = (t) => 1 - (1 - t) ** 3;
-const easeOutBack = (t) => 1 + 2.70158 * (t - 1) ** 3 + 1.70158 * (t - 1) ** 2;
-const mix = (a, b, t) => a.map((v, i) => Math.round(v + (b[i] - v) * t));
 const rgba = (rgb, a) => `rgba(${rgb}, ${a})`;
 function rand(seed) {
   let s = seed;
@@ -158,22 +154,348 @@ const MODELS = [
   return { segs, scatter, live: m.live };
 });
 
-/* ---------- The engine ---------- */
+const LAB = [241, 243, 246];    // the lab's paper
+const DIM = '123, 147, 255';     // dimension lines and the second copper layer, in the logo's blue
+const hash01 = (v) => { const s = Math.sin(v) * 43758.5453; return s - Math.floor(s); };
 
-function makeParticles(n, seed) {
-  const rnd = rand(seed);
-  return Array.from({ length: n }, () => ({
-    a: rnd() * TAU, r: .35 + rnd() * 1.9, v: .1 + rnd() * .12, w: .25 + rnd() * .35, hot: rnd() < .16, size: 1.2 + rnd() * 1.3, rnd,
-  }));
+/* ---------- The growing circuit ---------- */
+// The hero is a circuit board routing itself. A chip sits on the board with the logo's orange disc as
+// its die. A trace leaves every pin, fans out and routes itself at 45° and 90°, branching, keeping
+// clear of other traces and of the headline, and ending in a pad or a via. Signals then run out along
+// the finished traces. The pointer steers the growth, a click starts new branches, and every visit
+// grows a different board.
+
+const DIRS = [[1, 0], [1, 1], [0, 1], [-1, 1], [-1, 0], [-1, -1], [0, -1], [1, -1]]; // clockwise from east, y down
+const FREE = 0, BLOCK = 1, TRACE = 2;
+const SPEED = 15; // cells a trace grows per second
+// a translucent colour flattened onto the board, so overlapping segment ends don't darken
+const flat = (rgb, a) => `rgb(${rgb.split(',').map((v, i) => Math.round(BG[i] + (v - BG[i]) * a)).join(', ')})`;
+const COPPER = [flat(LINE, .34), flat(DIM, .55)]; // the top and bottom layers
+const chance = (p) => Math.random() < p;
+const pick = (a) => a[Math.floor(Math.random() * a.length)];
+const toward = (dx, dy) => ((Math.round(Math.atan2(dy, dx) / (Math.PI / 4)) % 8) + 8) % 8; // nearest of the 8 directions
+
+export class Circuit {
+  // w, h: the hero in CSS px; g: grid pitch; keep: [{x, y, w, h}] areas to stay clear of; chip: {x, y, r}
+  layout(w, h, g, keep, chip, dpr) {
+    Object.assign(this, { w, h, g, traces: [], heads: [], ends: [], signals: [], flashes: [], clock: 0, nextSignal: 0, nextSprout: 0, filled: 0 });
+    const C = (this.C = Math.floor(w / g) + 1), R = (this.R = Math.floor(h / g) + 1);
+    this.cell = new Uint8Array(C * R);  // FREE, BLOCK or TRACE
+    this.own = new Int32Array(C * R);   // the trace a cell belongs to
+    this.idx = new Int32Array(C * R);   // and how far along that trace it is
+    this.diag = new Uint8Array(C * R);  // a diagonal crosses the square to the right of and below this point
+    const block = (c0, r0, c1, r1) => {
+      for (let r = Math.max(0, r0); r <= Math.min(R - 1, r1); r++) for (let c = Math.max(0, c0); c <= Math.min(C - 1, c1); c++) this.cell[r * C + c] = BLOCK;
+    };
+    for (const k of keep) block(Math.floor(k.x / g), Math.floor(k.y / g), Math.ceil((k.x + k.w) / g), Math.ceil((k.y + k.h) / g));
+    const c0 = Math.round(chip.x / g), r0 = Math.round(chip.y / g), H = Math.max(3, Math.round((chip.r * 1.4) / g));
+    block(c0 - H, r0 - H, c0 + H, r0 + H);
+    this.chip = { H, x: c0 * g, y: r0 * g, rad: chip.r };
+    this.space = this.cell.filter((v) => v === FREE).length;
+
+    this.board = document.createElement('canvas'); // finished copper is drawn once, here
+    this.board.width = Math.round(w * dpr);
+    this.board.height = Math.round(h * dpr);
+    this.b = this.board.getContext('2d');
+    this.b.setTransform(dpr, 0, 0, dpr, 0, 0);
+    this.b.lineCap = 'round';
+    this.drawChip();
+
+    // a trace leaves every pin; the outer ones fan out first, as in a real breakout
+    let n = 0;
+    for (let d = 0; d < 8; d += 2) {
+      const [dx, dy] = DIRS[d], [sx, sy] = DIRS[(d + 2) % 8];
+      for (let o = 1 - H; o < H; o += 2) {
+        const c = c0 + dx * (H + 1) + sx * o, r = r0 + dy * (H + 1) + sy * o;
+        if (c < 0 || r < 0 || c >= C || r >= R || this.cell[r * C + c] !== FREE) continue;
+        const fan = Array(Math.round(Math.abs(o) * 1.5)).fill((d + (o > 0 ? 1 : 7)) % 8);
+        const t = this.add(c, r, d, null, 0, [d, d, ...fan, d], n++ * .03 + Math.random() * .15);
+        t.max += 30; // the first traces run furthest
+        this.take(c, r, t);
+      }
+    }
+  }
+
+  add(c, r, dir, parent, at, plan = [], delay = 0) {
+    const t = {
+      id: this.traces.length, pts: [[c, r]], dir, plan, parent, base: parent ? parent.base + at : 0,
+      run: 0, acc: 0, delay: this.clock + delay, max: 12 + Math.floor(Math.random() * 50), speed: .8 + Math.random() * .4,
+      layer: parent ? parent.layer : 0, done: false,
+    };
+    this.traces.push(t);
+    this.heads.push(t);
+    return t;
+  }
+
+  take(c, r, t) {
+    const i = r * this.C + c;
+    this.cell[i] = TRACE; this.own[i] = t.id; this.idx[i] = t.pts.length - 1;
+    this.filled++;
+  }
+
+  // can trace t step from (c, r) in direction d?
+  free(t, c, r, d) {
+    const { C, R } = this, [dx, dy] = DIRS[d], nc = c + dx, nr = r + dy;
+    if (nc < 0 || nr < 0 || nc >= C || nr >= R || this.cell[nr * C + nc] !== FREE) return false;
+    if (dx && dy && this.diag[Math.min(r, nr) * C + Math.min(c, nc)]) return false; // never cross another diagonal
+    // keep a clear cell between this trace and every other one
+    for (let y = Math.max(0, nr - 1); y <= Math.min(R - 1, nr + 1); y++) {
+      for (let x = Math.max(0, nc - 1); x <= Math.min(C - 1, nc + 1); x++) {
+        const j = y * C + x;
+        if (this.cell[j] !== TRACE) continue;
+        const o = this.traces[this.own[j]];
+        if (o === t ? this.idx[j] >= t.pts.length - 3                                  // its own last few cells
+          : (o === t.parent && t.pts.length < 4) || (o.parent === t && this.idx[j] < 3)) continue; // where a branch leaves
+        return false;
+      }
+    }
+    return true;
+  }
+
+  move(t, d) {
+    const [c, r] = t.pts[t.pts.length - 1], [dx, dy] = DIRS[d], nc = c + dx, nr = r + dy, g = this.g, b = this.b;
+    if (dx && dy) this.diag[Math.min(r, nr) * this.C + Math.min(c, nc)] = 1;
+    t.run = d === t.dir ? t.run + 1 : 0;
+    t.dir = d;
+    t.pts.push([nc, nr]);
+    this.take(nc, nr, t);
+    b.strokeStyle = COPPER[t.layer]; b.lineWidth = 1.5;
+    b.beginPath(); b.moveTo(c * g, r * g); b.lineTo(nc * g, nr * g); b.stroke();
+  }
+
+  step(t) {
+    const [c, r] = t.pts[t.pts.length - 1], n = t.pts.length;
+    if (n > t.max) return this.end(t);
+    let d = t.dir;
+    if (t.plan.length) d = t.plan.shift();
+    else if (t.run >= 2) {
+      if (chance(d % 2 ? .3 : .07)) d = (d + pick([1, 7])) % 8; // long straight runs, short 45° jogs
+      const p = this.pointer;
+      if (p) { // lean toward the pointer
+        const px = p.x - c * this.g, py = p.y - r * this.g, dist = Math.hypot(px, py);
+        if (dist > 16 && dist < 320 && chance(.35)) {
+          const turn = ((toward(px, py) - t.dir + 12) % 8) - 4;
+          if (turn) d = (t.dir + Math.sign(turn) + 8) % 8;
+        }
+      }
+      if (t.run > 4 && chance(.012)) { this.via(c, r, t.layer); t.layer ^= 1; } // drop through to the other layer
+    }
+    // branch now and then, until the board is busy enough
+    if (n > 2 && chance(.055) && this.filled < this.space * .2 && this.heads.length < 90) this.add(c, r, (t.dir + pick([2, 6, 2, 6, 1, 7])) % 8, t, n - 1);
+    const tries = [d, t.dir, ...(chance(.5) ? [t.dir + 1, t.dir + 7] : [t.dir + 7, t.dir + 1])];
+    for (const o of tries) if (this.free(t, c, r, o % 8)) return this.move(t, o % 8);
+    this.end(t);
+  }
+
+  end(t) {
+    t.done = true;
+    this.heads.splice(this.heads.indexOf(t), 1);
+    if (t.pts.length < 2) return; // a branch that found no room
+    const [c, r] = t.pts[t.pts.length - 1];
+    t.edge = c === 0 || r === 0 || c === this.C - 1 || r === this.R - 1; // it carries on off the board
+    if (!t.edge) chance(.6) ? this.via(c, r, t.layer) : this.pad(c, r, t.layer);
+    t.route = this.route(t);
+    this.ends.push(t);
+  }
+
+  // every cell from the chip to the end of trace t
+  route(t) { return t.parent ? this.route(t.parent).slice(0, t.base).concat(t.pts) : t.pts.slice(); }
+
+  pad(c, r, layer) {
+    this.b.fillStyle = COPPER[layer];
+    this.b.fillRect(c * this.g - 3, r * this.g - 3, 6, 6);
+  }
+
+  via(c, r, layer) { // a plated hole
+    const b = this.b, x = c * this.g, y = r * this.g;
+    b.fillStyle = COPPER[layer]; b.beginPath(); b.arc(x, y, 3.2, 0, TAU); b.fill();
+    b.fillStyle = `rgb(${BG})`; b.beginPath(); b.arc(x, y, 1.4, 0, TAU); b.fill();
+  }
+
+  drawChip() {
+    const b = this.b, g = this.g, { x, y, H } = this.chip, s = H * g;
+    b.strokeStyle = COPPER[0]; b.lineWidth = 1.5;
+    b.beginPath();
+    for (let d = 0; d < 8; d += 2) { // the pins
+      const [dx, dy] = DIRS[d], [sx, sy] = DIRS[(d + 2) % 8];
+      for (let o = 1 - H; o < H; o += 2) {
+        b.moveTo(x + dx * s + sx * o * g, y + dy * s + sy * o * g);
+        b.lineTo(x + dx * (s + g) + sx * o * g, y + dy * (s + g) + sy * o * g);
+      }
+    }
+    b.stroke();
+    b.fillStyle = 'rgb(13, 18, 30)'; b.fillRect(x - s, y - s, 2 * s, 2 * s);
+    b.strokeStyle = flat(LINE, .5); b.lineWidth = 1; b.strokeRect(x - s + .5, y - s + .5, 2 * s - 1, 2 * s - 1);
+    // the pin-1 dot and the reference designator, as printed on a real board
+    b.fillStyle = flat(LINE, .45);
+    b.beginPath(); b.arc(x - s + 6, y - s + 6, 1.5, 0, TAU); b.fill();
+    b.font = '600 9px Archivo, system-ui, sans-serif'; b.textAlign = 'right';
+    b.fillText('U1', x + s - 5, y + s - 5);
+  }
+
+  // grow up to n branches from the traces nearest to (x, y), heading for it
+  sprout(x, y, n, reach) {
+    if (this.filled > this.space * .4 || this.heads.length > 120) return;
+    const { C, R, g } = this, cc = Math.round(x / g), cr = Math.round(y / g), k = Math.ceil(reach / g), found = [];
+    for (let r = Math.max(0, cr - k); r <= Math.min(R - 1, cr + k); r++) {
+      for (let c = Math.max(0, cc - k); c <= Math.min(C - 1, cc + k); c++) if (this.cell[r * C + c] === TRACE) found.push([Math.hypot(c - cc, r - cr), r * C + c]);
+    }
+    found.sort((a, b) => a[0] - b[0]);
+    let made = 0;
+    for (const [dist, j] of found) {
+      if (made >= n || dist * g > reach) break;
+      if (dist < 1.5) continue; // right on top of it: nowhere to head for
+      const t = this.traces[this.own[j]], i = this.idx[j], [c, r] = t.pts[i], d = toward(x - c * g, y - r * g);
+      if (!this.free({ pts: [t.pts[i]], parent: t }, c, r, d)) continue;
+      this.add(c, r, d, t, i, [d, d]);
+      made++;
+    }
+  }
+
+  branchAt(x, y) {
+    this.sprout(x, y, 3, 240);
+    this.flashes.push({ x, y, t: this.clock, r: 18 });
+  }
+
+  // dt in seconds; pointer: {x, y, active} in hero px, or null
+  update(dt, pointer) {
+    this.clock += dt;
+    this.pointer = pointer;
+    for (const t of [...this.heads]) {
+      if (this.clock < t.delay) continue;
+      t.acc += dt * SPEED * t.speed;
+      while (t.acc >= 1 && !t.done) { t.acc -= 1; this.step(t); }
+    }
+    if (pointer && pointer.active && this.clock > this.nextSprout) {
+      this.nextSprout = this.clock + .35;
+      this.sprout(pointer.x, pointer.y, 1, 130);
+    }
+    // signals run out from the chip along finished traces
+    if (this.ends.length && this.clock > this.nextSignal && this.signals.length < 24) {
+      this.nextSignal = this.clock + .08 + Math.random() * .14;
+      const t = pick(this.ends);
+      this.signals.push({ route: t.route, edge: t.edge, at: 0, speed: 30 + Math.random() * 24 });
+    }
+    for (const s of this.signals) {
+      s.at += dt * s.speed;
+      if (!s.hit && s.at >= s.route.length - 1) {
+        s.hit = true;
+        const [c, r] = s.route[s.route.length - 1];
+        if (!s.edge) this.flashes.push({ x: c * this.g, y: r * this.g, t: this.clock, r: 9 });
+      }
+    }
+    this.signals = this.signals.filter((s) => s.at < s.route.length + 10);
+    this.flashes = this.flashes.filter((f) => this.clock - f.t < .6);
+  }
+
+  // grow the whole board at once (reduced motion, or a new layout after the opening)
+  finish() {
+    for (let k = 0; k < 5000 && this.heads.length; k++) for (const t of [...this.heads]) if (!t.done) this.step(t);
+  }
+
+  draw(x, ox, oy) {
+    const g = this.g, { x: cx, y: cy, rad } = this.chip;
+    x.drawImage(this.board, ox, oy, this.w, this.h);
+    x.save();
+    x.translate(ox, oy);
+    if (this.lit) { x.fillStyle = '#DF6826'; x.beginPath(); x.arc(cx, cy, rad, 0, TAU); x.fill(); } // the die, flat as in the logo
+    x.lineCap = 'round';
+
+    // the growing ends: a hot tail and a bright tip
+    for (const t of this.heads) {
+      if (this.clock < t.delay) continue;
+      const n = t.pts.length, [c, r] = t.pts[n - 1], [dx, dy] = DIRS[t.dir], e = Math.min(1, t.acc);
+      const hx = (c + dx * e) * g, hy = (r + dy * e) * g;
+      const tail = [...t.pts.slice(Math.max(0, n - 6)).map(([pc, pr]) => [pc * g, pr * g]), [hx, hy]];
+      x.lineWidth = 1.6;
+      for (let k = 1; k < tail.length; k++) {
+        x.strokeStyle = rgba(ORANGE, k / tail.length);
+        x.beginPath(); x.moveTo(tail[k - 1][0], tail[k - 1][1]); x.lineTo(tail[k][0], tail[k][1]); x.stroke();
+      }
+      x.fillStyle = rgba(ORANGE, .25); x.beginPath(); x.arc(hx, hy, 6, 0, TAU); x.fill();
+      x.fillStyle = '#FFD2AE'; x.fillRect(hx - 2, hy - 2, 4, 4);
+    }
+
+    // signals
+    for (const s of this.signals) {
+      const R = s.route, last = R.length - 1, head = Math.min(s.at, last), tail = Math.max(0, s.at - 10);
+      if (tail >= last) continue;
+      const at = (u) => {
+        const i = Math.min(last - 1, Math.floor(u)), f = u - i;
+        return [(R[i][0] + (R[i + 1][0] - R[i][0]) * f) * g, (R[i][1] + (R[i + 1][1] - R[i][1]) * f) * g];
+      };
+      const us = [tail];
+      for (let u = Math.floor(tail) + 1; u < head; u++) us.push(u);
+      us.push(head);
+      x.lineWidth = 2;
+      for (let k = 1; k < us.length; k++) {
+        const [ax, ay] = at(us[k - 1]), [bx, by] = at(us[k]);
+        x.strokeStyle = rgba(ORANGE, .9 * ((us[k] - tail) / 10));
+        x.beginPath(); x.moveTo(ax, ay); x.lineTo(bx, by); x.stroke();
+      }
+      if (s.at < last) {
+        const [hx, hy] = at(head);
+        x.fillStyle = rgba(ORANGE, .3); x.beginPath(); x.arc(hx, hy, 5, 0, TAU); x.fill();
+        x.fillStyle = '#FFD2AE'; x.beginPath(); x.arc(hx, hy, 1.8, 0, TAU); x.fill();
+      }
+    }
+
+    // a ring where a signal lands, or where a click started new branches
+    x.lineWidth = 1.5;
+    for (const f of this.flashes) {
+      const k = (this.clock - f.t) / .6;
+      x.strokeStyle = rgba(ORANGE, 1 - k);
+      x.beginPath(); x.arc(f.x, f.y, 3 + f.r * ease(k), 0, TAU); x.stroke();
+    }
+    x.restore();
+  }
 }
+
+// The logo's orange disc as a specification drawing, drawn in stages as k goes from 0 to 1:
+// construction circle, centre lines, the disc, then its diameter.
+export function drawMark(x, cx, cy, r, t, k = 1) {
+  if (k <= 0) return;
+  const a = ease(clamp(k / .35)), b = ease(clamp((k - .2) / .3)), f = ease(clamp((k - .4) / .3)), d = ease(clamp((k - .65) / .35));
+  x.save();
+  x.lineWidth = 1;
+  x.strokeStyle = rgba(LINE, .3);
+  x.setLineDash([6, 6]); x.lineDashOffset = -t * 8;
+  x.beginPath(); x.arc(cx, cy, r * 1.25, -Math.PI / 2, -Math.PI / 2 + TAU * a); x.stroke();
+  x.setLineDash([]);
+  if (b > 0) { // centre lines, from the centre out
+    const L = r * 1.5 * b;
+    x.beginPath();
+    x.moveTo(cx - L, cy + .5); x.lineTo(cx + L, cy + .5);
+    x.moveTo(cx + .5, cy - L); x.lineTo(cx + .5, cy + L);
+    x.stroke();
+  }
+  if (f > 0) { // the disc, swept round; flat, exactly as in the logo
+    x.fillStyle = '#DF6826';
+    x.beginPath(); x.moveTo(cx, cy); x.arc(cx, cy, r, -Math.PI / 2, -Math.PI / 2 + TAU * f); x.closePath(); x.fill();
+  }
+  if (d > 0) { // diameter dimension below the disc, in the logo's blue
+    const y = cy + r * 1.5 + 14, half = r * d;
+    x.globalAlpha = d;
+    x.strokeStyle = rgba(DIM, .8); x.fillStyle = rgba(DIM, .9);
+    x.beginPath();
+    x.moveTo(cx - r + .5, cy + r * .2); x.lineTo(cx - r + .5, y + 6); x.moveTo(cx + r + .5, cy + r * .2); x.lineTo(cx + r + .5, y + 6);
+    x.moveTo(cx - half, y + .5); x.lineTo(cx + half, y + .5);
+    if (d > .95) { x.moveTo(cx - r - 4, y + 4); x.lineTo(cx - r + 4, y - 4); x.moveTo(cx + r - 4, y + 4); x.lineTo(cx + r + 4, y - 4); }
+    x.stroke();
+    x.font = '500 12px Archivo, system-ui, sans-serif'; x.textAlign = 'center';
+    x.fillText(`Ø ${Math.round(r * 2)} px`, cx, y + 20);
+  }
+  x.restore();
+}
+
+/* ---------- The engine ---------- */
 
 export class Engine {
   constructor(canvas) {
     this.c = canvas;
     this.x = canvas.getContext('2d');
-    this.machines = new Map();
-    const rnd = rand(5);
-    this.segRing = Array.from({ length: 22 }, () => [rnd() * TAU, .04 + rnd() * .22]);
+    this.pens = 0;   // how far down the sheet the grid has been ruled, in page px
+    this.born = [];  // when each horizontal grid line was ruled, in seconds
   }
 
   resize() {
@@ -182,156 +504,69 @@ export class Engine {
     this.c.width = Math.round(w * d); this.c.height = Math.round(h * d);
   }
 
-  // s: { time, dt, white, gridShift, mouse, machines: [{id, x, y, r, amt, intro, pingAge}], models: [{x, y, r, amt, type, assemble}] }
+  // s: { time, dt, scroll, still, rule, models: [{x, y, r, amt, type, assemble}],
+  //      circuit: { c, x, y } | null, wave: { k, x, y, w, h } | null, mark: { x, y, r, k } | null }
   render(s) {
     const x = this.x;
     x.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
-    x.fillStyle = `rgb(${mix(BG, LAB, s.white)})`;
+    x.fillStyle = `rgb(${BG})`;
     x.fillRect(0, 0, this.w, this.h);
     this.grid(s);
     for (const m of s.models) if (m.amt > 0 && m.r > 0) this.model(m, s.time);
-    for (const m of s.machines) if (m.amt > 0 && m.r > 0) this.machine(m, s);
+    if (s.mark) drawMark(x, s.mark.x, s.mark.y, s.mark.r, s.time, s.mark.k);
+    if (s.circuit) s.circuit.c.draw(x, s.circuit.x, s.circuit.y);
+    if (s.wave) this.tiles(s.wave, s.scroll);
   }
 
+  // The blueprint grid is ruled as the page is read. A row of pens comes down the sheet behind the
+  // reader, drawing the vertical lines, and each horizontal line is ruled across as the pens pass it,
+  // alternately left to right and right to left. Ruled lines stay ruled.
   grid(s) {
-    const x = this.x, g = 48, off = ((-s.gridShift % g) + g) % g;
-    x.strokeStyle = rgba(LINE, .05 * (1 - s.white));
+    const x = this.x, G = 48, top = s.scroll, w = this.w, h = this.h;
     x.lineWidth = 1;
+    x.strokeStyle = rgba(LINE, .05);
     x.beginPath();
-    for (let gx = .5; gx < this.w; gx += g) { x.moveTo(gx, 0); x.lineTo(gx, this.h); }
-    for (let gy = off + .5; gy < this.h; gy += g) { x.moveTo(0, gy); x.lineTo(this.w, gy); }
+    if (s.still) {
+      for (let gx = .5; gx < w; gx += G) { x.moveTo(gx, 0); x.lineTo(gx, h); }
+      for (let gy = (((-top % G) + G) % G) + .5; gy < h; gy += G) { x.moveTo(0, gy); x.lineTo(w, gy); }
+      x.stroke();
+      return;
+    }
+    if (s.rule && this.pens < top - G) this.pens = top - G; // after a jump, the pens start again just above the screen
+    const gap = top + h - this.pens;
+    if (s.rule && gap > 0) this.pens += Math.min(gap, Math.max(gap * (1 - Math.exp(-s.dt * 2.2)), s.dt * 260));
+    while (this.born.length * G <= this.pens) this.born.push(s.time);
+    const pen = this.pens - top; // where the pens are on screen
+    if (pen > 0) for (let gx = .5; gx < w; gx += G) { x.moveTo(gx, 0); x.lineTo(gx, Math.min(h, pen)); }
+    const tips = [];
+    for (let k = Math.max(0, Math.floor(top / G)); k < this.born.length && k * G < top + h; k++) {
+      const p = ease(clamp((s.time - this.born[k]) / .9)), y = k * G - top + .5;
+      if (p <= 0) continue;
+      const a = k % 2 ? w * (1 - p) : 0, b = k % 2 ? w : w * p;
+      x.moveTo(a, y); x.lineTo(b, y);
+      if (p < 1) tips.push([k % 2 ? a : b, y]);
+    }
     x.stroke();
+    x.fillStyle = rgba(ORANGE, .8);
+    if (pen > 0 && pen < h && gap > 1) for (let gx = .5; gx < w; gx += G) x.fillRect(gx - 1.5, pen - 1.5, 3, 3);
+    for (const [px, py] of tips) x.fillRect(px - 2, py - 2, 4, 4);
   }
 
-  machine(m, s) {
-    const x = this.x, R = m.r, cx = m.x, cy = m.y;
-    if (!this.machines.has(m.id)) this.machines.set(m.id, { rot: [0, 0, 0, 0], tilt: [0, 0], parts: makeParticles(m.id === 'hero' ? 150 : 70, m.id.length * 7) });
-    const st = this.machines.get(m.id);
-    const ping = m.pingAge >= 0 && m.pingAge < 1.4 ? m.pingAge : -1;
-    const spin = 1 + (ping >= 0 ? 5 * Math.exp(-ping * 1.6) : 0);
-    const dt = s.dt;
-    st.rot[0] += dt * .035 * spin; st.rot[1] -= dt * .1 * spin; st.rot[2] += dt * .38 * spin; st.rot[3] += dt * .29 * spin;
-    // the machine leans toward the pointer
-    const tx = clamp((s.mouse.y - cy) / this.h, -.5, .5) * .7, ty = clamp((s.mouse.x - cx) / this.w, -.5, .5) * .7;
-    st.tilt[0] += (tx - st.tilt[0]) * .06; st.tilt[1] += (ty - st.tilt[1]) * .06;
-    const k = (i, n = 5, span = .45) => ease(clamp((m.intro - (i / n) * (1 - span)) / span));
-    const fade = 1 - m.white;
-
+  // White tiles sweep across the blueprint grid and print the hero into the lab's paper
+  tiles(wv, scroll) {
+    const x = this.x, G = 48;
+    x.fillStyle = `rgb(${LAB})`;
+    if (wv.k >= 1.12) { x.fillRect(wv.x, wv.y, wv.w, wv.h); return; }
+    const off = ((((-scroll % G) + G) % G - wv.y) % G + G) % G; // keep the tiles on the grid
+    const cols = Math.ceil(wv.w / G), rows = Math.ceil(wv.h / G) + 1;
     x.save();
-    x.globalAlpha = m.amt;
-    x.lineCap = 'round';
-
-    // particles drawn in toward the core
-    const pa = clamp((m.intro - .7) / .3) * fade;
-    if (pa > 0) {
-      const wave = ping >= 0 ? .27 + ping * 1.5 : -1;
-      for (const p of st.parts) {
-        p.r -= p.v * dt * (1 + (spin - 1) * .3);
-        p.a += (p.w * dt * spin) / Math.max(p.r, .3);
-        if (wave > 0 && p.r < wave) p.r = wave + .02;
-        if (p.r < .3) { p.r = 1.4 + p.rnd() * 1.1; p.a = p.rnd() * TAU; }
-        let px = cx + Math.cos(p.a) * p.r * R, py = cy + Math.sin(p.a) * p.r * R * .92;
-        const dx = px - s.mouse.x, dy = py - s.mouse.y, dd = Math.hypot(dx, dy);
-        if (dd < 70) { px += (dx / (dd || 1)) * (70 - dd) * .6; py += (dy / (dd || 1)) * (70 - dd) * .6; }
-        x.fillStyle = p.hot ? rgba(ORANGE, .9 * pa) : rgba(LINE, .5 * pa * clamp((2.6 - p.r) / .8));
-        x.beginPath(); x.arc(px, py, p.size, 0, TAU); x.fill();
-      }
-    }
-
-    // gimbal rings turning in 3D: back halves first, front halves after the core
-    const gimbals = [[.7, (p) => rotY(rotX(p, st.rot[2]), .35)], [.6, (p) => rotX(rotY(p, st.rot[3]), .55)]];
-    const tilt = (p) => rotY(rotX(p, st.tilt[0]), st.tilt[1]);
-    const gpts = gimbals.map(([rho, rot]) => [rho - .02, rho + .02].map((rr) => {
-      const out = [];
-      for (let j = 0; j <= 96; j++) { const a = (j / 96) * TAU; out.push(project(tilt(rot([Math.cos(a) * rr, Math.sin(a) * rr, 0])), cx, cy, R)); }
-      return out;
-    }));
-    const drawGimbals = (front) => {
-      gpts.forEach((band, gi) => {
-        const reveal = k(2 + gi * .4);
-        x.lineWidth = 1.2;
-        band.forEach((pts) => {
-          for (let j = 0; j < 96 * reveal; j++) {
-            const [ax, ay, az] = pts[j], [bx, by] = pts[j + 1];
-            if ((az >= 0) !== front) continue;
-            x.strokeStyle = rgba(LINE, (front ? .75 : .22) * fade);
-            x.beginPath(); x.moveTo(ax, ay); x.lineTo(bx, by); x.stroke();
-          }
-        });
-        for (let j = 0; j < 96 * reveal; j += 4) { // cross ticks make it a machined band
-          const a = band[0][j], b = band[1][j];
-          if ((a[2] >= 0) !== front) continue;
-          x.strokeStyle = rgba(LINE, (front ? .55 : .15) * fade);
-          x.beginPath(); x.moveTo(a[0], a[1]); x.lineTo(b[0], b[1]); x.stroke();
-        }
-      });
-    };
-    drawGimbals(false);
-
-    // outer dial with ticks and degree marks
-    const d0 = k(0);
-    x.strokeStyle = rgba(LINE, .45 * fade); x.lineWidth = 1;
-    x.beginPath(); x.arc(cx, cy, R, st.rot[0], st.rot[0] + TAU * d0); x.stroke();
-    x.beginPath();
-    for (let i = 0; i < 180 * d0; i++) {
-      const a = st.rot[0] + (i / 180) * TAU, len = i % 15 === 0 ? .06 : i % 5 === 0 ? .035 : .018;
-      x.moveTo(cx + Math.cos(a) * R, cy + Math.sin(a) * R);
-      x.lineTo(cx + Math.cos(a) * R * (1 - len), cy + Math.sin(a) * R * (1 - len));
-    }
-    x.stroke();
-    if (d0 > .8 && R < 900) {
-      x.fillStyle = rgba(LINE, .35 * fade * (d0 - .8) * 5);
-      x.font = `500 ${Math.max(9, Math.min(13, R * .03))}px Archivo, system-ui, sans-serif`;
-      x.textAlign = 'center'; x.textBaseline = 'middle';
-      for (let i = 0; i < 12; i++) {
-        const a = st.rot[0] + (i / 12) * TAU;
-        x.fillText(String(i * 30), cx + Math.cos(a) * R * .9, cy + Math.sin(a) * R * .9);
-      }
-    }
-
-    // segmented ring in the logo's blue
-    const d1 = k(1);
-    x.strokeStyle = rgba(BLUE, .8 * fade); x.lineWidth = Math.max(2, R * .012);
-    for (const [start, len] of this.segRing) {
-      x.beginPath(); x.arc(cx, cy, R * .82, st.rot[1] + start, st.rot[1] + start + len * d1); x.stroke();
-    }
-
-    // inner rings and spokes
-    const d3 = k(3);
-    x.lineWidth = 1; x.strokeStyle = rgba(LINE, .3 * fade);
-    for (const rr of [.4, .35]) { x.beginPath(); x.arc(cx, cy, R * rr, 0, TAU * d3); x.stroke(); }
-    x.beginPath();
-    for (let i = 0; i < 24; i++) {
-      const a = -st.rot[1] * .5 + (i / 24) * TAU;
-      x.moveTo(cx + Math.cos(a) * R * .42, cy + Math.sin(a) * R * .42);
-      x.lineTo(cx + Math.cos(a) * R * (.42 + .08 * d3), cy + Math.sin(a) * R * (.42 + .08 * d3));
-    }
-    x.stroke();
-
-    // the core: the orange disc from the logo
-    const pop = easeOutBack(clamp((m.intro - .5) / .5));
-    const rc = R * .27 * pop * (1 + .015 * Math.sin(s.time * 2.2));
-    if (rc > 0) {
-      const g = x.createRadialGradient(cx - rc * .3, cy - rc * .3, rc * .1, cx, cy, rc);
-      g.addColorStop(0, `rgb(${mix([255, 184, 128], LAB, m.white)})`);
-      g.addColorStop(.55, `rgb(${mix([223, 104, 38], LAB, m.white)})`);
-      g.addColorStop(1, `rgb(${mix([170, 70, 18], LAB, m.white)})`);
-      x.save();
-      x.shadowColor = rgba(ORANGE, .8 * fade);
-      x.shadowBlur = Math.min(90, rc * .9) * fade;
-      x.fillStyle = g;
-      x.beginPath(); x.arc(cx, cy, rc, 0, TAU); x.fill();
-      x.restore();
-      x.strokeStyle = `rgba(255, 255, 255, ${.22 * fade})`; x.lineWidth = 1;
-      for (const f of [.75, .52, .3]) { x.beginPath(); x.arc(cx, cy, rc * f, 0, TAU); x.stroke(); }
-    }
-
-    drawGimbals(true);
-
-    // the pulse after a click
-    if (ping >= 0) {
-      x.strokeStyle = rgba(ORANGE, (1 - ping / 1.4) * fade); x.lineWidth = 2;
-      x.beginPath(); x.arc(cx, cy, R * (.27 + ping * 1.5), 0, TAU); x.stroke();
+    x.translate(wv.x, wv.y);
+    for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
+      const ty = off + (r - 1) * G, at = (c / cols) * .55 + (1 - r / rows) * .25 + hash01(c * 12.9 + Math.round((ty + scroll) / G) * 78.2) * .15;
+      const k = ease(clamp((wv.k - at) / .12));
+      if (k <= 0) continue;
+      const z = G * k;
+      x.fillRect(c * G + (G - z) / 2, ty + (G - z) / 2, z + .5, z + .5);
     }
     x.restore();
   }
