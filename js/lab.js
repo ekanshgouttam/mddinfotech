@@ -1,6 +1,6 @@
 // The lab: a bright room where each service is a live engineering diagram.
 // Diagrams draw themselves in, then keep running. At the end the room breaks up
-// into tiles and the universe shows through.
+// into tiles and the machine room shows through.
 
 const LAB = '#F1F3F6';
 const INK = 'rgba(7, 8, 11, .82)';

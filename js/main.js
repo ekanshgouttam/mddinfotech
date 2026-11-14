@@ -1,4 +1,4 @@
-import { Universe } from './universe.js';
+import { Engine } from './engine.js';
 import { Lab } from './lab.js';
 
 const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -6,7 +6,6 @@ const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const clamp = (v, a = 0, b = 1) => Math.min(b, Math.max(a, v));
 const smooth = (t) => t * t * (3 - 2 * t);
-const easeOutBack = (t) => 1 + 2.70158 * (t - 1) ** 3 + 1.70158 * (t - 1) ** 2;
 const rect = (el) => el.getBoundingClientRect();
 const onScreen = (r, margin = 0) => r.bottom > -margin && r.top < innerHeight + margin;
 const body = document.body;
@@ -17,27 +16,29 @@ function progress(section) {
   return span > 0 ? clamp(-r.top / span) : (r.top < 0 ? 1 : 0);
 }
 
-/* ---------- The universe layer ---------- */
-const universe = new Universe($('#universe'));
-if (!universe.ok) document.documentElement.classList.add('no-gl');
+/* ---------- The machine room (everything behind the dark sections) ---------- */
+const engine = new Engine($('#engine'));
 
 const mouse = { x: -1e4, y: -1e4 };
 addEventListener('pointermove', (e) => { mouse.x = e.clientX; mouse.y = e.clientY; }, { passive: true });
 
-// Click (or tap) near the star: a flare leaves the limb toward that point.
-let sunNow = { x: 0, y: 0, r: 0, amt: 0 };
-const flare = { angle: 0, start: -1e9 };
-const nearStar = (x, y) => sunNow.amt > 0 && Math.hypot(x - sunNow.x, y - sunNow.y) < sunNow.r * 2.4;
-function triggerFlare(e) {
-  if (e.target.closest('a, button') || !nearStar(e.clientX, e.clientY)) return;
-  flare.angle = Math.atan2(e.clientY - sunNow.y, e.clientX - sunNow.x);
-  flare.start = performance.now();
+// Click (or tap) on a machine: it spins up and sends out a pulse.
+const machinesNow = {};
+const ping = { id: '', start: -1e9 };
+const machineAt = (x, y) => Object.keys(machinesNow).find((id) => {
+  const m = machinesNow[id];
+  return m && Math.hypot(x - m.x, y - m.y) < m.r;
+});
+function triggerPing(e) {
+  if (e.target.closest('a, button')) return;
+  const id = machineAt(e.clientX, e.clientY);
+  if (id) { ping.id = id; ping.start = performance.now(); }
 }
-$('#hero').addEventListener('click', triggerFlare);
-$('#contact').addEventListener('click', triggerFlare);
+$('#hero').addEventListener('click', triggerPing);
+$('#contact').addEventListener('click', triggerPing);
 
-/* ---------- Hero: the star, then the flight into it ---------- */
-const hero = { sec: $('#hero'), stage: $('#hero .stage'), anchor: $('#hero .sun-anchor'), ui: $('.hero-ui'), p: 0 };
+/* ---------- Hero: the growth engine, then the dive into its core ---------- */
+const hero = { sec: $('#hero'), stage: $('#hero .stage'), anchor: $('#hero .core-anchor'), ui: $('.hero-ui'), p: 0 };
 function updateHero() {
   const box = rect(hero.sec);
   if (!onScreen(box)) return { visible: false, white: 0 };
@@ -54,7 +55,7 @@ function updateHero() {
   y += (innerHeight / 2 - y) * toCentre;
   r *= 30 ** (z * z);
   const white = reduce ? smooth(clamp((p - 0.4) / 0.35)) : smooth(clamp((z - 0.6) / 0.34));
-  hero.stage.classList.toggle('near-star', nearStar(mouse.x, mouse.y) && p < 0.16);
+  hero.stage.classList.toggle('near-core', p < 0.16 && Math.hypot(mouse.x - x, mouse.y - y) < r);
   return { visible: true, x, y, r, white };
 }
 
@@ -97,27 +98,28 @@ lab.tabs.forEach((tab, i) => tab.addEventListener('click', () => {
   scrollTo({ top: lab.sec.offsetTop + ((i + 0.5) / lab.svcs.length) * SVC_END * span, behavior: reduce ? 'auto' : 'smooth' });
 }));
 
-/* ---------- Work: a world per project ---------- */
-const work = { sec: $('#work'), anchor: $('.planet-anchor'), missions: $$('.mission'), count: $('.count span'), active: -1 };
-const OFF = { x: 0, y: 0, r: 0, amt: 0, type: 0 };
+/* ---------- Work: a model per project, rebuilt between projects ---------- */
+const work = { sec: $('#work'), anchor: $('.model-anchor'), missions: $$('.mission'), count: $('.count span'), active: -1 };
 function updateWork() {
-  if (!onScreen(rect(work.sec))) return [OFF, OFF];
+  const box = rect(work.sec);
+  if (!onScreen(box)) return [];
   const n = work.missions.length;
   const s = progress(work.sec) * n, i = Math.min(n - 1, Math.floor(s));
-  const f = i < n - 1 ? smooth(clamp((s - i - 0.66) / 0.34)) : 0;  // travel to the next world
+  const f = i < n - 1 ? smooth(clamp((s - i - 0.66) / 0.34)) : 0;  // take this model apart, build the next
   const active = i + (f > 0.5 ? 1 : 0);
   if (active !== work.active) {
     work.active = active;
     work.missions.forEach((el, k) => el.classList.toggle('is-active', k === active));
     work.count.textContent = active + 1;
   }
-  const a = rect(work.anchor), cx = a.left + a.width / 2, cy = a.top + a.height / 2, R = a.width / 2;
-  const cur = { x: cx - f * innerWidth * 0.85, y: cy + f * R * 0.2, r: R * (1 - 0.45 * f), amt: 1, type: i };
-  const next = f > 0 ? { x: cx + (1 - f) * innerWidth * 0.8, y: cy - (1 - f) * R * 0.15, r: R * (0.55 + 0.45 * f), amt: 1, type: i + 1 } : OFF;
-  return [cur, next];
+  const enter = smooth(clamp((1 - box.top / innerHeight - 0.25) / 0.6)); // the first model builds as the section arrives
+  const a = rect(work.anchor), cx = a.left + a.width / 2, cy = a.top + a.height / 2, R = a.width * 0.36; // model + turntable fit the anchor
+  const models = [{ x: cx - f * R * 0.3, y: cy, r: R, amt: 1, type: i, assemble: Math.min(1 - f, enter) }];
+  if (f > 0) models.push({ x: cx + (1 - f) * R * 0.3, y: cy, r: R, amt: 1, type: i + 1, assemble: f });
+  return models;
 }
 
-/* ---------- Process: the flight path ---------- */
+/* ---------- Process: a circuit trace with a signal running along it ---------- */
 const proc = {
   sec: $('#process'), stage: $('#process .stage'), plan: $('.route-plan'), flown: $('.route-flown'),
   probe: $('.probe'), steps: $$('.step'), wps: $$('.waypoint'), len: 0, marks: [],
@@ -127,26 +129,36 @@ function buildRoute() {
   const pts = proc.wps.map((w) => { const r = rect(w); return [r.left + r.width / 2 - s.left, r.top + r.height / 2 - s.top]; });
   if (!pts.length) return;
   const last = pts[pts.length - 1];
-  const path = [vertical ? [pts[0][0], pts[0][1] - 24] : [-40, pts[0][1] + s.height * 0.18]];
-  pts.forEach((p, i) => {
-    path.push(p);
-    if (i < pts.length - 1) { // arc between waypoints, alternating sides: a transfer orbit
-      const q = pts[i + 1], side = i % 2 ? 1 : -1;
-      path.push(vertical ? [(p[0] + q[0]) / 2 + side * 26, (p[1] + q[1]) / 2] : [(p[0] + q[0]) / 2, (p[1] + q[1]) / 2 + side * s.height * 0.1]);
-    }
-  });
-  path.push(vertical ? [last[0], last[1] + 220] : [s.width + 40, last[1] - s.height * 0.22]);
-  // Catmull-Rom through every point, written as cubic Béziers
-  let d = `M${path[0][0]},${path[0][1]}`;
-  for (let i = 0; i < path.length - 1; i++) {
-    const p0 = path[i - 1] || path[i], p1 = path[i], p2 = path[i + 1], p3 = path[i + 2] || p2;
-    d += ` C${p1[0] + (p2[0] - p0[0]) / 6},${p1[1] + (p2[1] - p0[1]) / 6} ${p2[0] - (p3[0] - p1[0]) / 6},${p2[1] - (p3[1] - p1[1]) / 6} ${p2[0]},${p2[1]}`;
+  // Straight runs with 45° jogs between pads, like a trace on a circuit board.
+  const path = [];
+  if (vertical) {
+    path.push([pts[0][0], pts[0][1] - 24]);
+    pts.forEach((p, i) => {
+      path.push(p);
+      const q = pts[i + 1];
+      if (!q) return;
+      const side = i % 2 ? 1 : -1, j = 16, dy = q[1] - p[1];
+      path.push([p[0], p[1] + dy * 0.3], [p[0] + side * j, p[1] + dy * 0.3 + j], [p[0] + side * j, q[1] - dy * 0.3 - j], [q[0], q[1] - dy * 0.3]);
+    });
+    path.push([last[0], last[1] + 220]);
+  } else {
+    const j = Math.min(44, s.height * 0.06);
+    path.push([-40, pts[0][1] + j * 2], [pts[0][0] - 40 - j * 2, pts[0][1] + j * 2], [pts[0][0] - 40, pts[0][1]]);
+    pts.forEach((p, i) => {
+      path.push(p);
+      const q = pts[i + 1];
+      if (!q) return;
+      const side = i % 2 ? 1 : -1, dx = q[0] - p[0];
+      path.push([p[0] + dx * 0.25, p[1]], [p[0] + dx * 0.25 + j, p[1] + side * j], [q[0] - dx * 0.25 - j, p[1] + side * j], [q[0] - dx * 0.25, q[1]]);
+    });
+    path.push([last[0] + 40, last[1]], [last[0] + 40 + j * 2, last[1] - j * 2], [s.width + 40, last[1] - j * 2]);
   }
+  const d = path.map(([x, y], i) => `${i ? 'L' : 'M'}${x},${y}`).join(' ');
   proc.plan.setAttribute('d', d);
   proc.flown.setAttribute('d', d);
   proc.len = proc.plan.getTotalLength();
   proc.flown.style.strokeDasharray = `${proc.len} ${proc.len}`;
-  // where along the path each waypoint sits
+  // where along the trace each pad sits
   const samples = [];
   for (let k = 0; k <= 600; k++) { const L = (k / 600) * proc.len, q = proc.plan.getPointAtLength(L); samples.push([L, q.x, q.y]); }
   proc.marks = pts.map(([x, y]) => samples.reduce((b, sm) => (Math.hypot(sm[1] - x, sm[2] - y) < Math.hypot(b[1] - x, b[2] - y) ? sm : b))[0]);
@@ -156,21 +168,19 @@ function updateProcess() {
   const L = proc.len * clamp((progress(proc.sec) - 0.05) / 0.85);
   proc.flown.style.strokeDashoffset = proc.len - L;
   const q = proc.plan.getPointAtLength(L);
-  proc.probe.setAttribute('cx', q.x); proc.probe.setAttribute('cy', q.y);
+  proc.probe.setAttribute('x', q.x - 5); proc.probe.setAttribute('y', q.y - 5);
   proc.steps.forEach((el, i) => el.classList.toggle('is-reached', L >= proc.marks[i] - 2));
 }
 
-/* ---------- Contact: the star again, far away ---------- */
-const farAnchor = $('.sun-far');
-function farSun() {
+/* ---------- Contact: the engine again, smaller ---------- */
+const farAnchor = $('.core-far');
+function contactMachine() {
   const a = rect(farAnchor);
-  return onScreen(a, a.width * 2) ? { x: a.left + a.width / 2, y: a.top + a.height / 2, r: a.width / 2, amt: 1 } : null;
+  return onScreen(a, a.width) ? { x: a.left + a.width / 2, y: a.top + a.height / 2, r: a.width / 2 } : null;
 }
 
 /* ---------- Frame loop ---------- */
-const OFF_SUN = { x: 0, y: 0, r: 0, amt: 0 };
-const t0 = performance.now();
-let igniteAt = -1;
+let powerAt = -1, last = performance.now();
 
 function frame(now) {
   tick(now);
@@ -178,47 +188,49 @@ function frame(now) {
 }
 
 function tick(now) {
+  const dt = Math.min(0.05, (now - last) / 1000);
+  last = now;
   const h = updateHero();
   const l = updateLab(now);
-  const planets = updateWork();
+  const models = updateWork();
   updateProcess();
+  const c = contactMachine();
 
-  sunNow = h.visible ? { x: h.x, y: h.y, r: h.r, amt: 1 } : (farSun() || OFF_SUN);
+  machinesNow.hero = h.visible ? { x: h.x, y: h.y, r: h.r } : null;
+  machinesNow.contact = c;
   body.classList.toggle('on-light', (h.visible && h.white > 0.5) || l.light);
+  body.style.setProperty('--nav-shade', h.visible ? (1 - clamp(h.white * 2)).toFixed(3) : '1');
+  if (l.covers) return; // the lab hides the machine room completely
 
-  if (universe.ok && !l.covers) {
-    const since = igniteAt < 0 ? -1 : (now - igniteAt) / 1000;
-    const flareAge = (now - flare.start) / 1000;
-    universe.render({
-      time: reduce ? 40 : now / 1000,
-      shift: scrollY * 0.12,
-      stars: reduce ? 1 : clamp((now - t0) / 1500),
-      sun: sunNow,
-      ignite: reduce ? 1 : since < 0 ? 0 : clamp(easeOutBack(clamp(since / 1.5)), 0, 1.12),
-      shock: reduce || since < 0 ? 0 : clamp((since - 0.15) / 1.7),
-      white: h.visible ? h.white : 0,
-      mouse,
-      flare: { angle: flare.angle, age: flareAge, strength: flareAge < 2.6 ? 1 : 0 },
-      planets,
-    });
-  }
+  const intro = reduce ? 1 : powerAt < 0 ? 0 : clamp((now - powerAt) / 1800);
+  const age = (id) => (ping.id === id ? (now - ping.start) / 1000 : -1);
+  const machines = [];
+  if (h.visible) machines.push({ id: 'hero', ...machinesNow.hero, amt: 1, intro, white: h.white, pingAge: age('hero') });
+  if (c) machines.push({ id: 'contact', ...c, amt: 1, intro: 1, white: 0, pingAge: age('contact') });
+  engine.render({
+    time: reduce ? 20 : now / 1000,
+    dt: reduce ? 0 : dt,
+    white: h.visible ? h.white : 0,
+    gridShift: scrollY * 0.5,
+    mouse, machines, models,
+  });
 }
 
 function resize() {
-  universe.ok && universe.resize();
+  engine.resize();
   labView.resize();
   buildRoute();
 }
 let resizeTimer = 0;
 addEventListener('resize', () => { clearTimeout(resizeTimer); resizeTimer = setTimeout(resize, 150); });
 
-/* ---------- Opening: the star ignites ---------- */
+/* ---------- Opening: the engine powers on ---------- */
 async function start() {
   await Promise.race([document.fonts.ready, new Promise((r) => setTimeout(r, 2500))]);
   resize();
   requestAnimationFrame(frame);
   const go = () => {
-    igniteAt = performance.now();
+    powerAt = performance.now();
     body.classList.add('is-ready');
     setTimeout(() => body.classList.add('is-settled'), 2600);
   };
