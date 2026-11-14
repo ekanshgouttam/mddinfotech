@@ -1,0 +1,7 @@
+# All search engines and AI assistants (Googlebot, Bingbot, GPTBot, ClaudeBot, PerplexityBot and others) are welcome.
+User-agent: *
+Allow: /
+# Old version of the site, kept only as a backup: not for search results.
+Disallow: /_v1/
+
+Sitemap: https://mddinfotech.net/sitemap.xml
