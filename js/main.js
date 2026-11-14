@@ -179,6 +179,124 @@ function contactMachine() {
   return onScreen(a, a.width) ? { x: a.left + a.width / 2, y: a.top + a.height / 2, r: a.width / 2 } : null;
 }
 
+/* ---------- Navigation: the core shows where you are and opens a map of the site ---------- */
+const nav = {
+  btn: $('.core-btn'), read: $('.core-section'), disc: $('.core-disc'), fill: $('.dial-fill'), ticks: $('.dial-ticks'),
+  map: $('#sitemap'), list: $('#sitemap nav'), trunk: $('.map-trunk'), hot: $('.map-hot'), nodes: $$('.map-node'),
+  sections: $$('main > section'), current: '', open: false, geo: null,
+};
+const DIAL = 2 * Math.PI * 21; // the dial's circumference in its own units
+const NAMES = { hero: 'Start', services: 'Services', work: 'Work', audience: 'Who we work with', process: 'Process', faq: 'Questions', contact: 'Contact' };
+
+function setReadout(text) {
+  nav.btn.setAttribute('aria-label', nav.open ? 'Close site map' : `Site map. You are in ${text}`);
+  if (nav.read.textContent === text) return;
+  nav.read.classList.add('is-swapping');
+  nav.read.textContent = text;
+  void nav.read.offsetHeight; // commit the start position, then let it rise into place
+  nav.read.classList.remove('is-swapping');
+}
+
+function updateNav() {
+  const total = document.documentElement.scrollHeight - innerHeight;
+  nav.fill.style.strokeDashoffset = (DIAL * (1 - clamp(total > 0 ? scrollY / total : 0))).toFixed(2);
+  const mid = innerHeight / 2;
+  const sec = nav.sections.find((s) => { const r = rect(s); return r.top <= mid && r.bottom > mid; });
+  if (!sec || sec.id === nav.current) return;
+  nav.current = sec.id;
+  nav.nodes.forEach((n) => (n.dataset.for === sec.id ? n.setAttribute('aria-current', 'location') : n.removeAttribute('aria-current')));
+  if (!nav.open) setReadout(NAMES[sec.id]);
+}
+
+// A tick on the dial wherever a section starts
+function buildDial() {
+  const total = document.documentElement.scrollHeight - innerHeight;
+  nav.ticks.innerHTML = nav.sections.slice(1).map((s) => {
+    const a = clamp(s.offsetTop / total) * Math.PI * 2;
+    return `<line x1="${24 + Math.cos(a) * 17.5}" y1="${24 + Math.sin(a) * 17.5}" x2="${24 + Math.cos(a) * 24.5}" y2="${24 + Math.sin(a) * 24.5}"></line>`;
+  }).join('');
+}
+
+// The circuit: from the core, across to a bus line, down, and a branch into each section
+function drawMap(animate) {
+  const d = rect(nav.disc), cx = d.left + d.width / 2, cy = d.top + d.height / 2;
+  nav.map.style.setProperty('--cx', `${cx}px`);
+  nav.map.style.setProperty('--cy', `${cy}px`);
+  const box = rect(nav.list), padLeft = box.left, busX = padLeft - 34, j = 12;
+  const ys = nav.nodes.map((n) => box.top + n.offsetTop + n.offsetHeight / 2);
+  const y0 = box.top - 30; // the trace drops out of the core and crosses below the header, clear of the logo
+  nav.geo = { cx, cy, busX, j, padLeft, ys, y0 };
+  let path = `${mapHead(nav.geo)} L${busX},${ys[ys.length - 1] - j}`;
+  ys.forEach((y) => { path += ` M${busX},${y - j} L${busX + j},${y} L${padLeft},${y}`; });
+  nav.trunk.setAttribute('d', path);
+  const len = nav.trunk.getTotalLength();
+  nav.trunk.style.transition = 'none';
+  nav.trunk.style.strokeDasharray = `${len} ${len}`;
+  nav.trunk.style.strokeDashoffset = animate ? len : 0;
+  if (animate) {
+    void nav.trunk.getBoundingClientRect();
+    nav.trunk.style.transition = 'stroke-dashoffset 1.1s cubic-bezier(.2, .7, .1, 1) .15s';
+    nav.trunk.style.strokeDashoffset = 0;
+  }
+}
+
+// From the bottom of the core, down, then across to the top of the bus line
+const mapHead = ({ cx, cy, busX, j, y0 }) => `M${cx},${cy + 14} L${cx},${y0 - j} L${cx - j},${y0} L${busX + j},${y0} L${busX},${y0 + j}`;
+
+// Hovering a section sends a signal from the core to it
+function signalTo(i) {
+  if (!nav.geo) return;
+  const { busX, j, padLeft, ys } = nav.geo, y = ys[i];
+  nav.hot.setAttribute('d', `${mapHead(nav.geo)} L${busX},${y - j} L${busX + j},${y} L${padLeft},${y}`);
+  const len = nav.hot.getTotalLength();
+  nav.hot.style.transition = 'none';
+  nav.hot.style.strokeDasharray = `${len} ${len}`;
+  nav.hot.style.strokeDashoffset = len;
+  nav.hot.style.opacity = 1;
+  void nav.hot.getBoundingClientRect();
+  nav.hot.style.transition = 'stroke-dashoffset .5s cubic-bezier(.2, .7, .1, 1)';
+  nav.hot.style.strokeDashoffset = 0;
+}
+
+function openMap() {
+  nav.open = true;
+  document.documentElement.classList.add('no-scroll');
+  body.classList.add('map-open');
+  nav.map.classList.add('is-open');
+  nav.btn.setAttribute('aria-expanded', 'true');
+  setReadout('Close');
+  drawMap(true);
+  nav.nodes[0].focus({ preventScroll: true });
+}
+function closeMap() {
+  nav.open = false;
+  document.documentElement.classList.remove('no-scroll');
+  body.classList.remove('map-open');
+  nav.map.classList.remove('is-open');
+  nav.btn.setAttribute('aria-expanded', 'false');
+  nav.hot.style.opacity = 0;
+  setReadout(NAMES[nav.current] || 'Start');
+}
+
+nav.btn.addEventListener('click', () => (nav.open ? closeMap() : openMap()));
+// Any link closes the map (and the page then travels there); a click on empty space just closes it
+nav.map.addEventListener('click', (e) => { if (e.target.closest('a') || !e.target.closest('nav')) closeMap(); });
+$('.brand').addEventListener('click', () => nav.open && closeMap());
+nav.nodes.forEach((n, i) => {
+  n.addEventListener('pointerenter', () => signalTo(i));
+  n.addEventListener('focus', () => signalTo(i));
+});
+addEventListener('keydown', (e) => {
+  if (!nav.open) return;
+  if (e.key === 'Escape') { closeMap(); nav.btn.focus(); return; }
+  if (e.key === 'Tab') { // keep focus on the core and the map while it is open
+    const stops = [nav.btn, ...$$('a', nav.map)], i = stops.indexOf(document.activeElement);
+    const next = e.shiftKey ? (i <= 0 ? stops.length - 1 : i - 1) : (i === stops.length - 1 ? 0 : i + 1);
+    stops[next].focus();
+    e.preventDefault();
+  }
+});
+
 /* ---------- Frame loop ---------- */
 let powerAt = -1, last = performance.now();
 
@@ -194,6 +312,7 @@ function tick(now) {
   const l = updateLab(now);
   const models = updateWork();
   updateProcess();
+  updateNav();
   const c = contactMachine();
 
   machinesNow.hero = h.visible ? { x: h.x, y: h.y, r: h.r } : null;
@@ -220,6 +339,8 @@ function resize() {
   engine.resize();
   labView.resize();
   buildRoute();
+  buildDial();
+  if (nav.open) drawMap(false);
 }
 let resizeTimer = 0;
 addEventListener('resize', () => { clearTimeout(resizeTimer); resizeTimer = setTimeout(resize, 150); });

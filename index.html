@@ -118,13 +118,45 @@
     <img class="logo logo-dark" src="assets/logo-dark.png" alt="" width="267" height="117">
     <img class="logo logo-light" src="assets/logo-light.png" alt="" width="267" height="117">
   </a>
-  <nav aria-label="Main">
-    <a class="nav-link" href="#services">Services</a>
-    <a class="nav-link" href="#work">Work</a>
-    <a class="nav-link" href="#process">Process</a>
-    <a class="nav-cta" href="#contact">Start a project</a>
-  </nav>
+  <!-- Navigation is an instrument: the core shows where you are and opens a map of the site -->
+  <button class="core-btn" type="button" aria-expanded="false" aria-controls="sitemap" aria-label="Site map. You are in Start">
+    <span class="core-read"><span class="core-section">Start</span></span>
+    <span class="core-gauge" aria-hidden="true">
+      <svg class="core-dial" viewBox="0 0 48 48">
+        <circle class="dial-track" cx="24" cy="24" r="21"></circle>
+        <g class="dial-ticks"></g>
+        <circle class="dial-fill" cx="24" cy="24" r="21"></circle>
+      </svg>
+      <span class="core-disc"></span>
+    </span>
+  </button>
 </header>
+
+<!-- The site map, drawn as a circuit from the core -->
+<div class="map" id="sitemap" role="dialog" aria-modal="true" aria-label="Site map">
+  <svg class="map-traces" aria-hidden="true">
+    <path class="map-trunk"></path>
+    <path class="map-hot"></path>
+  </svg>
+  <nav aria-label="Main">
+    <ul class="map-list">
+      <li><a class="map-node" href="#top" data-for="hero" style="--i:0"><span class="pad" aria-hidden="true"></span>Start</a></li>
+      <li><a class="map-node" href="#services" data-for="services" style="--i:1"><span class="pad" aria-hidden="true"></span>Services</a></li>
+      <li><a class="map-node" href="#work" data-for="work" style="--i:2"><span class="pad" aria-hidden="true"></span>Work</a></li>
+      <li><a class="map-node" href="#audience" data-for="audience" style="--i:3"><span class="pad" aria-hidden="true"></span>Who we work with</a></li>
+      <li><a class="map-node" href="#process" data-for="process" style="--i:4"><span class="pad" aria-hidden="true"></span>Process</a></li>
+      <li><a class="map-node" href="#faq" data-for="faq" style="--i:5"><span class="pad" aria-hidden="true"></span>Questions</a></li>
+      <li><a class="map-node" href="#contact" data-for="contact" style="--i:6"><span class="pad" aria-hidden="true"></span>Start a project</a></li>
+    </ul>
+    <ul class="map-direct">
+      <li><a href="mailto:info@mddinfotech.net">info@mddinfotech.net</a></li>
+      <li><a href="tel:+917014485827">+91 70144 85827</a></li>
+      <li><a href="https://wa.me/917014485827" target="_blank" rel="noopener">WhatsApp</a></li>
+      <li><a href="https://www.instagram.com/mddinfotech/" target="_blank" rel="noopener">Instagram</a></li>
+      <li><a href="https://www.linkedin.com/company/mdd_infotech/" target="_blank" rel="noopener">LinkedIn</a></li>
+    </ul>
+  </nav>
+</div>
 
 <main id="top">
 
