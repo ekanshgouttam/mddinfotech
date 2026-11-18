@@ -81,9 +81,13 @@ update its link in the `#sitemap` list in `index.html` and its name in `NAMES` i
 
 ## Making changes and deploying
 
-1. Create a branch, make the change, and check it locally.
-2. Push the branch and open a pull request on GitHub.
-3. The repository owner reviews it and merges it into `main` with **Create a merge commit**.
+`main` is the live site. Work happens on the `dev` branch.
+
+1. Switch to `dev` and bring it up to date with the live site: `git switch dev`, then
+   `git pull origin main`.
+2. Make the change, check it locally, commit, and `git push`.
+3. When it is ready to go live, open a pull request on GitHub from `dev` into `main`.
+4. The repository owner reviews it and merges it with **Create a merge commit**.
    Vercel deploys `main` to mddinfotech.net automatically.
 
 The Vercel project is on the Hobby plan. On that plan Vercel deploys only commits made by the
