@@ -307,7 +307,7 @@ html { scrollbar-gutter: stable; }
 
 /* ---------- Work: a world per project ---------- */
 
-.js .work { height: 520vh; }
+.js .work { height: 860vh; } /* about 115vh of scroll per project */
 .work .stage { --pd: min(66vh, 42vw); }
 .model-anchor { left: 71%; top: 53%; width: var(--pd); height: var(--pd); translate: -50% -50%; }
 
@@ -321,28 +321,154 @@ html { scrollbar-gutter: stable; }
 .mission { position: absolute; left: 0; right: 0; bottom: 0; opacity: 0; visibility: hidden; transition: opacity .35s, visibility 0s .35s; }
 .mission.is-active { opacity: 1; visibility: visible; transition: opacity .6s .1s; }
 .mission-kind { font-size: 15px; color: var(--steel); margin-bottom: 10px; }
-.mission h3 {
-  font-size: clamp(44px, 6vw, 108px);
+.mission > h3 {
+  font-size: clamp(40px, 4.6vw, 84px);
   font-weight: 800; font-stretch: 62%;
   line-height: .92; letter-spacing: -.025em;
   margin-bottom: 20px;
   transition: font-stretch 1s var(--ease);
 }
-.mission.is-active h3 { font-stretch: 125%; }
-.mission-what { color: var(--text); }
-.mission-result { margin-top: 6px; font-size: 1.375rem; font-weight: 600; font-stretch: 110%; color: var(--orange-hot); }
+.mission.is-active > h3 { font-stretch: 125%; }
+.mission-what { color: var(--text); max-width: 34em; }
+.mission-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 24px; margin-top: 18px; }
+
+/* "About project": opens the project's dialog */
+.about-btn {
+  display: inline-flex; align-items: center; gap: 12px;
+  padding: 10px 16px 10px 18px; border: 1px solid rgba(255, 138, 61, .6); border-radius: 2px;
+  background: rgba(223, 104, 38, .1); cursor: pointer;
+  font-size: 15px; font-weight: 600; font-stretch: 110%; line-height: 1.2; color: var(--text);
+  transition: background-color .3s, border-color .3s, font-stretch .4s var(--ease);
+}
+.about-btn .pad { width: 10px; height: 10px; border-color: var(--orange); }
+.about-btn:hover, .about-btn:focus-visible { background: var(--orange); border-color: var(--orange); font-stretch: 120%; }
+.about-btn:hover .pad, .about-btn:focus-visible .pad { border-color: #fff; background: #fff; }
+.no-js .about-btn { display: none; }
+
+/* ---------- Project dialog: a spec sheet on the blueprint grid ---------- */
+
+.dossier {
+  position: fixed; inset: 0; width: 100%; height: 100%; max-width: none; max-height: none;
+  margin: 0; padding: clamp(12px, 4vw, 48px); border: 0;
+  background: transparent; color: var(--text); overflow-y: auto; overscroll-behavior: contain;
+  visibility: visible;   /* the project behind it may be fading out; the dialog stays */
+}
+.dossier[open] { display: grid; place-items: center; }
+.dossier::backdrop { background: rgba(7, 11, 20, .8); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
+
+.dossier-sheet {
+  position: relative; width: min(1060px, 100%);
+  padding: clamp(24px, 4vw, 56px);
+  background-color: var(--void);
+  background-image:
+    linear-gradient(rgba(205, 216, 240, .045) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(205, 216, 240, .045) 1px, transparent 1px);
+  background-size: 48px 48px;
+  border: 1px solid rgba(205, 216, 240, .16);
+  box-shadow: 0 40px 100px rgba(0, 0, 0, .55);
+}
+/* registration marks in the corners, like a drawing sheet */
+.dossier-sheet::before, .dossier-sheet::after {
+  content: ""; position: absolute; width: 22px; height: 22px; pointer-events: none;
+  border: 0 solid var(--orange);
+}
+.dossier-sheet::before { left: -1px; top: -1px; border-width: 2px 0 0 2px; }
+.dossier-sheet::after { right: -1px; bottom: -1px; border-width: 0 2px 2px 0; }
+
+.dossier-head {
+  display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px 24px; align-items: start;
+  padding-bottom: clamp(20px, 3vw, 32px); border-bottom: 1px solid rgba(205, 216, 240, .14);
+}
+.dossier-ref { grid-column: 1; font-size: 14px; font-weight: 500; font-stretch: 110%; color: var(--steel); font-variant-numeric: tabular-nums; }
+.dossier-ref b { color: var(--orange-hot); font-weight: 600; }
+.dossier-head h3 {
+  grid-column: 1;
+  font-size: clamp(32px, 4.4vw, 64px); font-weight: 800; font-stretch: 125%;
+  line-height: .95; letter-spacing: -.025em;
+}
+.dossier-head form { grid-column: 2; grid-row: 1 / span 2; }
+.dossier-close {
+  display: inline-flex; align-items: center; gap: 10px;
+  padding: 8px 12px; border: 1px solid rgba(205, 216, 240, .25); border-radius: 2px; background: none; cursor: pointer;
+  font-size: 14px; font-weight: 600; font-stretch: 110%; line-height: 1.2; color: var(--text);
+  transition: border-color .3s, color .3s;
+}
+.dossier-close:hover, .dossier-close:focus-visible { border-color: var(--orange); color: var(--orange-hot); }
+.dossier-x { position: relative; width: 12px; height: 12px; }
+.dossier-x::before, .dossier-x::after {
+  content: ""; position: absolute; left: 50%; top: 50%; width: 14px; height: 2px; margin: -1px 0 0 -7px;
+  background: var(--orange); rotate: 45deg;
+}
+.dossier-x::after { rotate: -45deg; }
+
+.dossier-body {
+  display: grid; grid-template-columns: minmax(0, 1.65fr) minmax(0, 1fr); gap: clamp(24px, 4vw, 56px);
+  padding-top: clamp(24px, 3vw, 36px);
+}
+.dossier-lede { font-size: clamp(1.0625rem, 1.35vw, 1.25rem); line-height: 1.6; }
+.dossier h4 { margin: clamp(24px, 3vw, 32px) 0 14px; font-size: 14px; font-weight: 600; font-stretch: 112%; color: var(--steel); }
+.dossier-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; }
+.dossier-list li { position: relative; padding-left: 26px; font-size: 1rem; line-height: 1.6; color: rgba(233, 236, 242, .82); }
+.dossier-list li::before {
+  content: ""; position: absolute; left: 0; top: .5em; width: 10px; height: 10px;
+  border: 1.5px solid var(--orange); border-radius: 2px;
+}
+.dossier-list strong { color: var(--text); font-weight: 650; }
+
+.dossier-spec {
+  margin: 0; padding-left: clamp(20px, 3vw, 36px); border-left: 1px solid rgba(205, 216, 240, .14);
+  display: grid; gap: 24px; align-content: start;
+}
+.dossier-spec dt { margin-bottom: 8px; font-size: 13px; font-weight: 600; font-stretch: 112%; color: var(--steel); }
+.dossier-spec dd { margin: 0; font-size: 1rem; line-height: 1.5; }
+.dossier-tags { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
+.dossier-tags li {
+  padding: 3px 10px; border: 1px solid rgba(123, 147, 255, .4); border-radius: 2px;
+  font-size: 13px; font-weight: 500; font-stretch: 105%; color: var(--blue-lit);
+}
+.dossier-links { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.dossier-links a, .dossier-cta a { color: var(--orange-hot); text-underline-offset: .22em; text-decoration-thickness: 1px; font-weight: 600; overflow-wrap: anywhere; }
+.dossier-links a:hover, .dossier-cta a:hover { color: var(--text); }
+
+.dossier-cta {
+  margin-top: clamp(28px, 4vw, 44px); padding-top: 20px; border-top: 1px solid rgba(205, 216, 240, .14);
+  font-size: 15px; color: var(--steel);
+}
+.dossier-cta a { margin-left: 6px; }
+
+/* Opening and closing are animated in main.js (openDossier, closeDossier): a chip flies out of the button,
+   becomes a beam, and the beam scans the sheet open. These are the beams. */
+.dossier-beam {
+  position: fixed; left: 0; top: 0; width: 0; height: 0; z-index: 2; pointer-events: none; opacity: 0;
+  border-radius: 1px; background: var(--orange);
+  box-shadow: 0 0 10px 1px rgba(223, 104, 38, .9), 0 0 32px 4px rgba(223, 104, 38, .45);
+}
+
+@media (max-width: 760px) {
+  .dossier { padding: 10px; }
+  .dossier[open] { place-items: start center; }
+  .dossier-body { grid-template-columns: minmax(0, 1fr); }
+  .dossier-spec { padding: 22px 0 0; border-left: 0; border-top: 1px solid rgba(205, 216, 240, .14); }
+  .dossier-close { padding: 8px 10px; }
+}
+
+/* Without JavaScript the dialog reads in place, under its project */
+.no-js .dossier { display: block; position: static; width: auto; height: auto; padding: 0; margin-top: 28px; overflow: visible; }
+.no-js .dossier-head form { display: none; }
 
 .no-js .work .stage { padding: 96px var(--gutter); }
 .no-js .missions, .no-js .mission, .no-js .work-head { position: static; width: auto; }
 .no-js .mission { opacity: 1; visibility: visible; margin-top: 56px; }
-.no-js .mission h3 { font-stretch: 125%; }
+.no-js .mission > h3 { font-stretch: 125%; }
 
 @media (max-width: 860px) {
   .work .stage { --pd: 74vw; }
   .model-anchor { left: 50%; top: 38%; }
   .missions { right: var(--gutter); width: auto; bottom: 6vh; }
-  .mission h3 { font-size: clamp(36px, 10vw, 56px); margin-bottom: 12px; }
-  .mission-result { font-size: 1.125rem; }
+  .mission > h3 { font-size: clamp(30px, 8.4vw, 48px); margin-bottom: 12px; }
+  .mission-what { font-size: 15px; }
+  .mission-actions { margin-top: 14px; gap: 10px 20px; }
+  .about-btn { padding: 9px 14px 9px 16px; font-size: 14px; }
 }
 
 /* ---------- Audience ---------- */

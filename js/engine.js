@@ -39,59 +39,19 @@ const box = (cx, cy, cz, w, h, d) => {
 const line = (a, b) => [[a, b]];
 const poly = (pts) => pts.slice(1).map((p, i) => [pts[i], p]);
 
-/* ---------- The four project models ---------- */
+/* ---------- The project models, one per project under "Selected work", in the same order ---------- */
 
-// Saffron & Salt: a serving bowl, heaped, with steam.
-function bowl() {
-  const prof = [[1, .32], [.97, .22], [.9, .04], [.77, -.16], [.6, -.33], [.47, -.44], [.46, -.52], [.52, -.58]];
+const ringXY = (r, z, n = 40, cx = 0, cy = 0) => { // an upright circle facing the viewer
   const s = [];
-  for (let m = 0; m < 24; m++) {
-    const a = (m / 24) * TAU;
-    s.push(...poly(prof.map(([r, y]) => [Math.cos(a) * r, y, Math.sin(a) * r])));
-  }
-  for (const i of [0, 2, 4, 6, 7]) s.push(...ring3(prof[i][0], prof[i][1]));
-  const dome = [[.95, .32], [.8, .44], [.55, .54], [.25, .6], [0, .62]];
-  for (let m = 0; m < 24; m += 3) {
-    const a = (m / 24) * TAU;
-    s.push(...poly(dome.map(([r, y]) => [Math.cos(a) * r, y, Math.sin(a) * r])));
-  }
-  s.push(...ring3(.55, .54, 36), ...ring3(.8, .44, 40));
-  return s;
-}
-const bowlLive = (t) => { // steam rising off the rice
-  const s = [];
-  for (let k = 0; k < 3; k++) {
-    const pts = [];
-    for (let j = 0; j <= 12; j++) pts.push([(k - 1) * .28 + .07 * Math.sin(j * .8 + t * 2.2 + k * 2), .66 + j * .065, (k - 1) * .1]);
-    s.push(...poly(pts).map((sg, j) => [...sg, 1 - j / 12]));
+  for (let i = 0; i < n; i++) {
+    const a = (i / n) * TAU, b = ((i + 1) / n) * TAU;
+    s.push([[cx + Math.cos(a) * r, cy + Math.sin(a) * r, z], [cx + Math.cos(b) * r, cy + Math.sin(b) * r, z]]);
   }
   return s;
 };
+const rectXY = (x0, y0, x1, y1, z) => poly([[x0, y0, z], [x1, y0, z], [x1, y1, z], [x0, y1, z], [x0, y0, z]]);
 
-// Kavya Rao: a camera.
-function camera() {
-  const s = [...box(0, 0, 0, 1.5, .9, .7), ...box(-.32, .56, 0, .44, .22, .44), ...box(.5, .5, 0, .24, .1, .3)];
-  const zs = [.35, .52, .72, .92], rs = [.36, .38, .34, .3];
-  zs.forEach((z, i) => {
-    const r = rs[i];
-    for (let k = 0; k < 32; k++) {
-      const a = (k / 32) * TAU, b = ((k + 1) / 32) * TAU;
-      s.push([[Math.cos(a) * r, Math.sin(a) * r, z], [Math.cos(b) * r, Math.sin(b) * r, z]]);
-    }
-  });
-  for (let k = 0; k < 8; k++) {
-    const a = (k / 8) * TAU;
-    s.push(...poly(zs.map((z, i) => [Math.cos(a) * rs[i], Math.sin(a) * rs[i], z])));
-  }
-  for (let k = 0; k < 24; k++) { // front glass
-    const a = (k / 24) * TAU, b = ((k + 1) / 24) * TAU;
-    s.push([[Math.cos(a) * .19, Math.sin(a) * .19, .92], [Math.cos(b) * .19, Math.sin(b) * .19, .92]]);
-  }
-  return s;
-}
-const cameraLive = (t) => (Math.sin(t * 4) > 0 ? [[[.6, .3, .36], [.6, .3, .36], 1, 'rec']] : []); // record light
-
-// Northfold: a lounge chair.
+// Rupankan Archo Interiors: a lounge chair.
 function chair() {
   const s = [];
   for (const x of [-.7, .7]) {
@@ -119,7 +79,7 @@ function chair() {
   return s;
 }
 
-// Ledgerly: a laptop with a live chart.
+// Pam Fincap: a laptop with a live chart.
 const LAP = { w: 1.7, d: 1.15, y: -.46, tilt: .26, h: 1.05 };
 function laptop() {
   const { w, d, y, tilt, h } = LAP, s = [...box(0, y - .04, 0, w, .08, d)];
@@ -142,11 +102,133 @@ const laptopLive = (t) => {
   return poly(pts).map((sg) => [...sg, 1, 'chart']);
 };
 
+// Sanjay Udhyog: bolts of fabric, one stacked on another, with cloth unrolling from the front one.
+function bolt(cy, cz, R, len) { // a roll of fabric lying along x: end spirals, the cloth's surface, the cardboard core
+  const s = [], x0 = -len / 2, x1 = len / 2, at = (x, a, r) => [x, cy + Math.sin(a) * r, cz + Math.cos(a) * r];
+  for (const x of [x0, x1]) {
+    const sp = []; // the layers of cloth seen on the end, as a spiral
+    for (let j = 0; j <= 96; j++) { const u = j / 96, a = u * TAU * 4; sp.push(at(x, a, R * (.28 + .72 * u))); }
+    s.push(...poly(sp));
+    const core = [];
+    for (let j = 0; j <= 20; j++) core.push(at(x, (j / 20) * TAU, R * .2));
+    s.push(...poly(core));
+  }
+  for (let k = 0; k < 18; k++) { const a = (k / 18) * TAU; s.push(...line(at(x0, a, R), at(x1, a, R))); }
+  for (const x of [x0 * .5, 0, x1 * .5]) { const ring = []; for (let j = 0; j <= 36; j++) ring.push(at(x, (j / 36) * TAU, R)); s.push(...poly(ring)); }
+  return s;
+}
+const CLOTH = { cy: -.4, cz: -.12, R: .55, len: 1.7 };
+const clothAt = (x, u) => { // the cloth leaving the bottom roll at its front and settling on the floor in soft folds
+  const { cy, cz, R } = CLOTH, y0 = cy - R * .8, floor = -.95; // it leaves the roll low on its front face
+  const fall = Math.sin(Math.min(1, u * 2.2) * Math.PI / 2);
+  return [x, y0 + (floor - y0) * fall + .045 * (1 + Math.sin(x * 5 + u * 9)) * u, cz + R * .6 + u * .95];
+};
+function fabric() {
+  const { cy, cz, R, len } = CLOTH, s = [...bolt(cy, cz, R, len), ...bolt(cy + R + .36, cz - .18, .36, len * .82)];
+  const w = len * .44;
+  for (let i = 0; i <= 8; i++) { // warp threads, running out of the roll
+    const x = -w + (i / 8) * 2 * w, pts = [];
+    for (let j = 0; j <= 14; j++) pts.push(clothAt(x, j / 14));
+    s.push(...poly(pts));
+  }
+  for (let j = 1; j <= 7; j++) { // weft threads, across the cloth
+    const u = j / 7, pts = [];
+    for (let i = 0; i <= 16; i++) pts.push(clothAt(-w + (i / 16) * 2 * w, u));
+    s.push(...poly(pts));
+  }
+  return s;
+}
+const fabricLive = (t) => { // a thread of orange runs down the cloth as it unrolls
+  const u = (t * .35) % 1, w = CLOTH.len * .44, pts = [];
+  for (let i = 0; i <= 16; i++) pts.push(clothAt(-w + (i / 16) * 2 * w, u));
+  return poly(pts).map((sg) => [...sg, 1, 'chart']);
+};
+
+// Silver Giftz: a gift box with a ribbon and a bow.
+function bow(y, sz) { // two loops and the knot, on top of a lid
+  const s = [];
+  for (const side of [-1, 1]) {
+    const pts = [];
+    for (let j = 0; j <= 16; j++) {
+      const u = (j / 16) * TAU;
+      pts.push([side * (sz * .55 + Math.cos(u) * sz * .5), y + sz * .35 + Math.sin(u) * sz * .32, 0]);
+    }
+    s.push(...poly(pts));
+  }
+  s.push(...box(0, y + .05, 0, sz * .22, .1, sz * .22));
+  return s;
+}
+function ribbon(y, w, d) { // a cross over the top of a box at height y
+  return [...line([-w / 2, y + .002, 0], [w / 2, y + .002, 0]), ...line([0, y + .002, -d / 2], [0, y + .002, d / 2])];
+}
+function giftBox() {
+  const s = [...box(0, -.45, 0, 1.2, 1.1, 1.2), ...box(0, .21, 0, 1.32, .22, 1.32)];
+  s.push(...ribbon(.32, 1.32, 1.32));
+  for (const sx of [-1, 1]) { // the ribbon down the sides
+    s.push(...line([sx * .6, -1, 0], [sx * .6, .1, 0]), ...line([0, -1, sx * .6], [0, .1, sx * .6]));
+    s.push(...line([sx * .66, .1, 0], [sx * .66, .32, 0]), ...line([0, .1, sx * .66], [0, .32, sx * .66]));
+  }
+  s.push(...bow(.32, .42));
+  return s;
+}
+
+// More Than Giftz: a stack of gift boxes for bulk orders.
+function giftStack() {
+  const s = [];
+  const boxes = [[0, -.7, 0, 1.5, .6, 1.3], [.08, -.15, .04, 1.08, .5, .96], [-.04, .3, 0, .66, .4, .62]];
+  for (const [x, y, z, w, h, d] of boxes) {
+    s.push(...box(x, y, z, w, h, d));
+    s.push(...ribbon(y + h / 2, w, d).map(([a, b]) => [[a[0] + x, a[1], a[2] + z], [b[0] + x, b[1], b[2] + z]]));
+    for (const sx of [-1, 1]) s.push(...line([x + sx * w / 2, y - h / 2, z], [x + sx * w / 2, y + h / 2, z]));
+  }
+  s.push(...bow(.5, .3).map(([a, b]) => [[a[0] - .04, a[1], a[2]], [b[0] - .04, b[1], b[2]]]));
+  // a tag hanging off the top box
+  s.push(...poly([[.33, .4, .31], [.6, .22, .31], [.62, .05, .31], [.48, .03, .31], [.46, .2, .31]]));
+  return s;
+}
+
+// Linkora: a phone showing a link-in-bio page.
+const PH = { w: .96, h: 1.9, d: .12, y: -.04 };
+const PH_LINKS = [.12, -.16, -.44, -.72];
+function phone() {
+  const { w, h, d, y } = PH, z = d / 2 + .005, s = [...box(0, y, 0, w, h, d)];
+  s.push(...rectXY(-w / 2 + .06, y - h / 2 + .1, w / 2 - .06, y + h / 2 - .1, z)); // screen
+  s.push(...ringXY(.15, z, 28, 0, .58), ...line([-.22, .34, z], [.22, .34, z])); // profile picture and name
+  for (const ly of PH_LINKS) s.push(...rectXY(-.34, ly - .1, .34, ly + .1, z)); // link buttons
+  return s;
+}
+const phoneLive = (t) => { // one link lights up at a time
+  const ly = PH_LINKS[Math.floor(t * 1.2) % PH_LINKS.length], z = PH.d / 2 + .01;
+  return rectXY(-.34, ly - .1, .34, ly + .1, z).map((sg) => [...sg, 1, 'chart']);
+};
+
+// JD Resume: a resume page with a second page behind it.
+function resume() {
+  const s = [], w = 1.3, h = 1.84, y0 = -.98, z = .02, c = .22;
+  s.push(...poly([[-w / 2, y0, z], [w / 2, y0, z], [w / 2, y0 + h - c, z], [w / 2 - c, y0 + h, z], [-w / 2, y0 + h, z], [-w / 2, y0, z]]));
+  s.push(...poly([[w / 2 - c, y0 + h, z], [w / 2 - c, y0 + h - c, z], [w / 2, y0 + h - c, z]])); // folded corner
+  s.push(...rectXY(-w / 2 + .1, .46, -w / 2 + .4, .76, z)); // photo
+  s.push(...line([-.08, .7, z], [.4, .7, z]), ...line([-.08, .58, z], [.26, .58, z])); // name and title
+  for (const [top, rows] of [[.28, 3], [-.24, 3], [-.66, 2]]) { // sections with lines of text
+    s.push(...line([-w / 2 + .1, top, z], [-.1, top, z]));
+    for (let r = 1; r <= rows; r++) s.push(...line([-w / 2 + .1, top - r * .1, z], [w / 2 - .12 - (r % 2) * .18, top - r * .1, z]));
+  }
+  s.push(...poly([[-w / 2 + .1, y0, -.14], [-w / 2 + .1, y0 + h - .06, -.14], [w / 2 + .1, y0 + h - .06, -.14], [w / 2 + .1, y0, -.14]])); // the page behind
+  return s;
+}
+const resumeLive = (t) => { // the ATS check ticks down the sections
+  const tops = [.28, -.24, -.66], top = tops[Math.floor(t * .9) % tops.length], z = .03, x = .5;
+  return [[[x - .06, top + .02, z], [x - .02, top - .03, z], 1, 'chart'], [[x - .02, top - .03, z], [x + .07, top + .07, z], 1, 'chart']];
+};
+
 const MODELS = [
-  { build: bowl, live: bowlLive },
-  { build: camera, live: cameraLive },
   { build: chair, live: () => [] },
   { build: laptop, live: laptopLive },
+  { build: fabric, live: fabricLive },
+  { build: giftBox, live: () => [] },
+  { build: giftStack, live: () => [] },
+  { build: phone, live: phoneLive },
+  { build: resume, live: resumeLive },
 ].map((m, k) => {
   const segs = m.build(), rnd = rand(31 + k);
   // each segment flies in from its own direction during assembly
@@ -609,12 +691,11 @@ export class Engine {
       x.beginPath(); x.moveTo(pa[0], pa[1]); x.lineTo(pb[0], pb[1]); x.stroke();
     });
 
-    // live details: steam, the chart, the record light
+    // live details in orange: the chart, the lit link, the ATS tick, the thread on the cloth
     const live = clamp((md.assemble - .8) / .2);
     if (live > 0) {
       for (const [a, b, w = 1, kind] of M.live(t)) {
         const pa = view(a), pb = view(b);
-        if (kind === 'rec') { x.fillStyle = rgba(ORANGE, live); x.beginPath(); x.arc(pa[0], pa[1], Math.max(3, R * .02), 0, TAU); x.fill(); continue; }
         x.strokeStyle = kind === 'chart' ? rgba(ORANGE, .95 * live) : rgba(LINE, .5 * w * live);
         x.lineWidth = kind === 'chart' ? 2 : 1.2;
         x.beginPath(); x.moveTo(pa[0], pa[1]); x.lineTo(pb[0], pb[1]); x.stroke();

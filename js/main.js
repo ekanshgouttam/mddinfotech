@@ -123,6 +123,136 @@ function updateWork() {
   return models;
 }
 
+/* "About project" opens the project's dialog as a small power-up, in the site's circuit language:
+   1. the button's pad lights, and an orange chip flies out of it to the middle of the screen;
+   2. the chip stretches into a glowing beam the width of the sheet;
+   3. the beam splits in two and the halves sweep apart, scanning the sheet open between them;
+   4. the registration marks draw in and the contents print in one after another: the name widens,
+      list pads flash, service tags pop.
+   Closing plays it backwards: the contents go, the sheet scans shut to a beam, the beam folds into the chip,
+   and the chip flies home into its button. The page underneath holds still while a dialog is open. */
+const EASE = 'cubic-bezier(.2, .7, .1, 1)', EASE_IN = 'cubic-bezier(.55, 0, .75, .2)';
+const anim = (dlg, el, frames, opts) => {
+  if (!el) return null;
+  try {
+    const a = el.animate(frames, opts);
+    dlg.anims.push(a);
+    return a;
+  } catch { return null; } // a pseudo-element the browser can't animate: skip that flourish
+};
+function beams(dlg) { // two glowing lines, created once per dialog, living in its top layer
+  if (!dlg.beams) dlg.beams = [0, 1].map(() => dlg.appendChild(Object.assign(document.createElement('span'), { className: 'dossier-beam' })));
+  return dlg.beams;
+}
+const place = (x, y, w, h, o = 1) => ({ left: `${x}px`, top: `${y}px`, width: `${w}px`, height: `${h}px`, opacity: o });
+function geometry(dlg) { // where the sheet is, and the middle of the part of it on screen
+  const s = rect($('.dossier-sheet', dlg)), b = rect(dlg.zoomBtn);
+  const top = Math.max(s.top, 0), bottom = Math.min(s.bottom, innerHeight), cy = (top + bottom) / 2;
+  return { s, b, top, bottom, cy, cx: s.left + s.width / 2 };
+}
+function stopAnims(dlg) { (dlg.anims || []).forEach((a) => a.cancel()); dlg.anims = []; }
+
+function openDossier(dlg, btn) {
+  if (dlg.open) return;
+  dlg.zoomBtn = btn;
+  document.documentElement.classList.add('no-scroll');
+  dlg.showModal();
+  dlg.scrollTop = 0;
+  if (reduce) return;
+  stopAnims(dlg);
+  const sheet = $('.dossier-sheet', dlg), [b1, b2] = beams(dlg), g = geometry(dlg), { s, b, cy, cx } = g;
+  const chip = 14, T1 = 420, T2 = 520; // chip flight + stretch, then the scan
+
+  // 1. press: the button's pad flashes
+  anim(dlg, $('.pad', btn), [{ background: '#fff', boxShadow: '0 0 14px 4px rgba(223,104,38,.9)' }, {}], { duration: 500, easing: 'ease-out' });
+  anim(dlg, dlg, { opacity: [0, 1] }, { duration: 500, easing: 'ease', pseudoElement: '::backdrop' });
+
+  // 2. the chip flies to the centre and stretches into a beam
+  anim(dlg, b1, [
+    { ...place(b.left + b.width - 26, b.top + b.height / 2 - 5, 10, 10), easing: 'cubic-bezier(.4, 0, .2, 1)' },
+    { ...place(cx - chip / 2, cy - chip / 2, chip, chip), offset: 0.55, easing: EASE },
+    place(s.left, cy - 1, s.width, 2),
+  ], { duration: T1, fill: 'forwards' });
+
+  // 3. the beam splits and the halves sweep apart, scanning the sheet open between them
+  const sweep = { duration: T2, delay: T1, easing: EASE, fill: 'forwards' };
+  anim(dlg, b1, [place(s.left, cy - 1, s.width, 2), { ...place(s.left, g.top - 1, s.width, 2), offset: 0.8 }, place(s.left, g.top - 1, s.width, 2, 0)], sweep);
+  anim(dlg, b2, [place(s.left, cy - 1, s.width, 2), { ...place(s.left, g.bottom - 1, s.width, 2), offset: 0.8 }, place(s.left, g.bottom - 1, s.width, 2, 0)], sweep);
+  const clipFrom = `inset(${cy - s.top}px 0 ${s.bottom - cy}px 0)`;
+  anim(dlg, sheet, [{ clipPath: clipFrom, opacity: 1 }, { clipPath: 'inset(0 0 0 0)', opacity: 1 }], { duration: T2, delay: T1, easing: EASE, fill: 'backwards' });
+  anim(dlg, sheet, [{ backgroundPosition: '0 24px, 24px 0' }, { backgroundPosition: '0 0, 0 0' }], { duration: T2 + 300, delay: T1, easing: EASE });
+
+  // 4. registration marks draw in, then the contents print in one after another
+  const at = T1 + T2 * 0.55;
+  for (const pe of ['::before', '::after']) anim(dlg, sheet, [{ width: '0px', height: '0px' }, { width: '22px', height: '22px' }], { duration: 450, delay: at, easing: EASE, fill: 'backwards', pseudoElement: pe });
+  const items = [
+    $('.dossier-ref', dlg), $('.dossier-head h3', dlg), $('.dossier-close', dlg), $('.dossier-lede', dlg), $('.dossier-main h4', dlg),
+    ...$$('.dossier-list li', dlg), ...$$('.dossier-spec > div', dlg), $('.dossier-cta', dlg),
+  ].filter(Boolean);
+  items.forEach((el, k) => {
+    const delay = at + k * 55;
+    anim(dlg, el, [
+      { opacity: 0, transform: 'translateY(10px)', clipPath: 'inset(-6px 100% -6px 0)' },
+      { opacity: 1, transform: 'none', clipPath: 'inset(-6px 0 -6px 0)' },
+    ], { duration: 520, delay, easing: EASE, fill: 'backwards' });
+    if (el.matches('h3')) anim(dlg, el, [{ fontStretch: '62%' }, { fontStretch: '125%' }], { duration: 900, delay, easing: EASE, fill: 'backwards' });
+    if (el.matches('li')) anim(dlg, el, [{ background: '#DF6826', boxShadow: '0 0 12px 2px rgba(223,104,38,.8)' }, {}], { duration: 700, delay: delay + 200, easing: 'ease-out', pseudoElement: '::before' });
+    $$('.dossier-tags li', el).forEach((tag, j) => anim(dlg, tag, [
+      { opacity: 0, transform: 'scale(.6)' }, { opacity: 1, transform: 'scale(1.08)', offset: 0.6 }, { opacity: 1, transform: 'none' },
+    ], { duration: 420, delay: delay + 180 + j * 70, easing: EASE, fill: 'backwards' }));
+  });
+}
+
+function closeDossier(dlg) {
+  if (!dlg.open || dlg.closing) return;
+  if (reduce || !dlg.zoomBtn) { dlg.close(); return; }
+  dlg.closing = true;
+  stopAnims(dlg);
+  const sheet = $('.dossier-sheet', dlg), [b1, b2] = beams(dlg), g = geometry(dlg), { s, b, cy, cx } = g;
+  const T1 = 180, T2 = 300, T3 = 360, done = { fill: 'forwards' };
+  // the contents fade, the sheet scans shut to a beam...
+  $$(':scope > *', sheet).forEach((el) => anim(dlg, el, { opacity: [1, 0] }, { duration: T1, easing: 'ease-in', ...done }));
+  for (const [el, edge] of [[b1, g.top], [b2, g.bottom]]) {
+    anim(dlg, el, [place(s.left, edge - 1, s.width, 2, 0), { ...place(s.left, edge - 1, s.width, 2), offset: 0.15 }, place(s.left, cy - 1, s.width, 2)], { duration: T2, delay: T1 * 0.5, easing: EASE_IN, fill: 'both' });
+  }
+  anim(dlg, sheet, [{ clipPath: 'inset(0 0 0 0)' }, { clipPath: `inset(${cy - s.top}px 0 ${s.bottom - cy}px 0)` }], { duration: T2, delay: T1 * 0.5, easing: EASE_IN, ...done });
+  // ...the beam folds into the chip, and the chip flies home into its button
+  anim(dlg, b2, { opacity: [1, 0] }, { duration: 1, delay: T1 * 0.5 + T2, ...done });
+  anim(dlg, b1, [
+    { ...place(s.left, cy - 1, s.width, 2), easing: EASE_IN },
+    { ...place(cx - 7, cy - 7, 14, 14), offset: 0.45, easing: 'cubic-bezier(.5, 0, .2, 1)' },
+    place(b.left + b.width - 26, b.top + b.height / 2 - 5, 10, 10, 0.2),
+  ], { duration: T3, delay: T1 * 0.5 + T2, ...done });
+  anim(dlg, dlg, { opacity: [1, 0] }, { duration: T1 * 0.5 + T2 + T3, easing: 'ease-in', pseudoElement: '::backdrop', ...done });
+  setTimeout(() => {
+    dlg.close();
+    stopAnims(dlg);
+    dlg.closing = false;
+    // the chip lands: the button's pad flashes
+    $('.pad', dlg.zoomBtn).animate([{ background: '#fff', boxShadow: '0 0 14px 4px rgba(223,104,38,.9)' }, {}], { duration: 500, easing: 'ease-out' });
+  }, T1 * 0.5 + T2 + T3);
+}
+$$('.about-btn').forEach((btn) => btn.addEventListener('click', () => {
+  const dlg = document.getElementById(btn.dataset.about);
+  if (dlg) openDossier(dlg, btn);
+}));
+$$('.dossier').forEach((dlg) => {
+  dlg.addEventListener('close', () => document.documentElement.classList.remove('no-scroll'));
+  dlg.addEventListener('cancel', (e) => { e.preventDefault(); closeDossier(dlg); }); // Esc
+  $('form', dlg).addEventListener('submit', (e) => { e.preventDefault(); closeDossier(dlg); }); // the Close button
+  dlg.addEventListener('click', (e) => {
+    if (e.target === dlg) { closeDossier(dlg); return; } // a click outside the sheet closes it
+    const link = e.target.closest('a[href^="#"]'); // "Start a project": close, let the page scroll again, then travel
+    if (!link) return;
+    e.preventDefault();
+    dlg.close(); // closing returns focus to the button, which would stop a scroll that had already started
+    document.documentElement.classList.remove('no-scroll');
+    const target = $(link.getAttribute('href'));
+    requestAnimationFrame(() => target?.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth' }));
+    history.replaceState(null, '', link.getAttribute('href'));
+  });
+});
+
 /* ---------- Process: a circuit trace with a signal running along it ---------- */
 const proc = {
   sec: $('#process'), stage: $('#process .stage'), plan: $('.route-plan'), flown: $('.route-flown'),

@@ -75,8 +75,6 @@ update its link in the `#sitemap` list in `index.html` and its name in `NAMES` i
 
 ## Content still to replace
 
-- The four projects under "Selected work" (Saffron & Salt, Kavya Rao, Northfold, Ledgerly) and
-  their results are samples. Replace them with real clients before the site is promoted.
 - "We reply within one working day" in the contact section is still to be confirmed.
 
 ## Making changes and deploying

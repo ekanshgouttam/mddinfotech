@@ -242,39 +242,274 @@
     </div>
   </section>
 
-  <!-- Work: each project is a wireframe model on a scanner.
-       PLACEHOLDER PROJECTS: the names and results below are samples. Replace them with real work before going live. -->
+  <!-- Work: each project is a wireframe model on a scanner. The models are MODELS in engine.js, in this order:
+       add or remove a project here and there together. -->
   <section class="scene work" id="work" aria-labelledby="work-title">
     <div class="stage">
       <div class="model-anchor" aria-hidden="true"></div>
       <div class="work-head">
         <h2 class="kicker" id="work-title">Selected work</h2>
-        <p class="count" aria-hidden="true"><span>1</span> / 4</p>
+        <p class="count" aria-hidden="true"><span>1</span> / 7</p>
       </div>
       <div class="missions">
+        <!-- Each project has an "About project" button that opens its dialog (.dossier). Without JavaScript the
+             dialog shows in place, under the project. -->
         <article class="mission">
-          <p class="mission-kind">Restaurant group</p>
-          <h3>Saffron &amp; Salt</h3>
-          <p class="mission-what">Website and social media</p>
-          <p class="mission-result">Online reservations up 3.1× in six months.</p>
+          <p class="mission-kind">Interior company, Jaipur</p>
+          <h3>Rupankan Archo Interiors</h3>
+          <p class="mission-what">SEO, social media marketing, content strategy and Meta Ads that put the company’s interior work in front of people planning their spaces, and bring in interior design enquiries.</p>
+          <div class="mission-actions">
+            <button class="about-btn" type="button" data-about="about-rupankan" aria-haspopup="dialog">About project <span class="pad" aria-hidden="true"></span></button>
+          </div>
+          <dialog class="dossier" id="about-rupankan" aria-labelledby="about-rupankan-title">
+            <div class="dossier-sheet">
+              <header class="dossier-head">
+                <p class="dossier-ref"><b>Project 01 / 07</b> · Interior company, Jaipur</p>
+                <h3 id="about-rupankan-title">Rupankan Archo Interiors</h3>
+                <form method="dialog"><button class="dossier-close" type="submit">Close <span class="dossier-x" aria-hidden="true"></span></button></form>
+              </header>
+              <div class="dossier-body">
+                <div class="dossier-main">
+                  <p class="dossier-lede">Rupankan Archo Interiors is an interior company in Jaipur. Interiors are chosen with the eyes: people want to see finished spaces before they trust a team with their own. So MDD Infotech puts the company’s work where people planning a home or a workspace will find it, and turns that interest into interior design enquiries.</p>
+                  <h4>What we did</h4>
+                  <ul class="dossier-list">
+                    <li><strong>Search engine optimisation.</strong> Work on the company’s website so it shows up when people in Jaipur search for interior design services.</li>
+                    <li><strong>Social media marketing.</strong> A steady presence on Instagram and LinkedIn that shows the company’s interior projects and design ideas, and keeps the brand in view.</li>
+                    <li><strong>Content strategy.</strong> A plan for what to publish and where, so every channel tells the same story about the company’s spaces and style.</li>
+                    <li><strong>Meta Ads.</strong> Facebook and Instagram campaigns aimed at people planning their homes and workspaces, built to bring in interior design enquiries.</li>
+                  </ul>
+                </div>
+                <dl class="dossier-spec">
+                  <div><dt>Services</dt><dd><ul class="dossier-tags"><li>SEO</li><li>Social media</li><li>Content strategy</li><li>Meta Ads</li></ul></dd></div>
+                  <div><dt>Industry</dt><dd>Interior design, Jaipur</dd></div>
+                  <div><dt>Focus</dt><dd>Brand visibility and interior design enquiries</dd></div>
+                  <div><dt>See it live</dt><dd><ul class="dossier-links">
+                    <li><a href="https://rupankanarchointeriors.com/" target="_blank" rel="noopener">rupankanarchointeriors.com</a></li>
+                    <li><a href="https://www.instagram.com/rupankan_archointeriors/" target="_blank" rel="noopener">Instagram</a></li>
+                    <li><a href="https://www.linkedin.com/company/rupankan-archo-interiors-jaipur/" target="_blank" rel="noopener">LinkedIn</a></li>
+                  </ul></dd></div>
+                </dl>
+              </div>
+              <p class="dossier-cta">Want more enquiries for your design or interior business? <a href="#contact">Start a project</a></p>
+            </div>
+          </dialog>
         </article>
         <article class="mission">
-          <p class="mission-kind">Lifestyle creator</p>
-          <h3>Kavya Rao</h3>
-          <p class="mission-what">Channel strategy, editing and brand deals</p>
-          <p class="mission-result">From 40k to 410k subscribers in 14 months.</p>
+          <p class="mission-kind">Finance company</p>
+          <h3>Pam Fincap</h3>
+          <p class="mission-what">A professional website, custom finance management software for loan and financial data, and Meta Ads campaigns for customer acquisition and lead generation.</p>
+          <div class="mission-actions">
+            <button class="about-btn" type="button" data-about="about-pamfincap" aria-haspopup="dialog">About project <span class="pad" aria-hidden="true"></span></button>
+          </div>
+          <dialog class="dossier" id="about-pamfincap" aria-labelledby="about-pamfincap-title">
+            <div class="dossier-sheet">
+              <header class="dossier-head">
+                <p class="dossier-ref"><b>Project 02 / 07</b> · Finance company</p>
+                <h3 id="about-pamfincap-title">Pam Fincap Pvt Ltd</h3>
+                <form method="dialog"><button class="dossier-close" type="submit">Close <span class="dossier-x" aria-hidden="true"></span></button></form>
+              </header>
+              <div class="dossier-body">
+                <div class="dossier-main">
+                  <p class="dossier-lede">Pam Fincap Pvt Ltd is a finance company. MDD Infotech built both sides of its digital business: the website its customers see, and the software its team uses to manage loans and financial data. We then ran advertising to bring in new customers.</p>
+                  <h4>What we did</h4>
+                  <ul class="dossier-list">
+                    <li><strong>Website.</strong> A professional website that presents the company and its services clearly and builds trust.</li>
+                    <li><strong>Finance management software.</strong> Custom software built for managing loan and financial data in one place.</li>
+                    <li><strong>Meta Ads.</strong> Facebook and Instagram campaigns for customer acquisition and lead generation.</li>
+                  </ul>
+                </div>
+                <dl class="dossier-spec">
+                  <div><dt>Services</dt><dd><ul class="dossier-tags"><li>Website development</li><li>Software development</li><li>Meta Ads</li></ul></dd></div>
+                  <div><dt>Focus</dt><dd>Customer acquisition and lead generation, on a website and software built for the business</dd></div>
+                  <div><dt>See it live</dt><dd><ul class="dossier-links">
+                    <li><a href="https://pamfincap.com/" target="_blank" rel="noopener">pamfincap.com</a></li>
+                    <li><a href="https://www.instagram.com/pam.fincap/" target="_blank" rel="noopener">Instagram</a></li>
+                  </ul></dd></div>
+                </dl>
+              </div>
+              <p class="dossier-cta">Need a website or software like this? <a href="#contact">Start a project</a></p>
+            </div>
+          </dialog>
         </article>
         <article class="mission">
-          <p class="mission-kind">Furniture brand</p>
-          <h3>Northfold</h3>
-          <p class="mission-what">Shopify build and performance marketing</p>
-          <p class="mission-result">4.6× return on Meta ad spend.</p>
+          <p class="mission-kind">Fabric company</p>
+          <h3>Sanjay Udhyog</h3>
+          <p class="mission-what">A fabric showcase website and social media marketing that put the fabric range in front of more buyers, for brand awareness, product visibility and customer engagement.</p>
+          <div class="mission-actions">
+            <button class="about-btn" type="button" data-about="about-sanjay" aria-haspopup="dialog">About project <span class="pad" aria-hidden="true"></span></button>
+          </div>
+          <dialog class="dossier" id="about-sanjay" aria-labelledby="about-sanjay-title">
+            <div class="dossier-sheet">
+              <header class="dossier-head">
+                <p class="dossier-ref"><b>Project 03 / 07</b> · Fabric company</p>
+                <h3 id="about-sanjay-title">Sanjay Udhyog</h3>
+                <form method="dialog"><button class="dossier-close" type="submit">Close <span class="dossier-x" aria-hidden="true"></span></button></form>
+              </header>
+              <div class="dossier-body">
+                <div class="dossier-main">
+                  <p class="dossier-lede">Sanjay Udhyog is a fabric company. Fabric is bought on what you can see: the weave, the colour, the finish. So MDD Infotech built a website that puts the fabric range front and centre, and runs the brand’s social media so its fabrics reach more buyers.</p>
+                  <h4>What we did</h4>
+                  <ul class="dossier-list">
+                    <li><strong>Fabric showcase website.</strong> A product-focused website built around the fabric range, so buyers can browse the collection, see the quality and get in touch.</li>
+                    <li><strong>Product presentation.</strong> Fabrics laid out clearly by product, so visitors find what they are looking for quickly.</li>
+                    <li><strong>Social media marketing.</strong> Regular Instagram content that shows off the fabrics, builds brand awareness and keeps buyers engaged.</li>
+                    <li><strong>Enquiries.</strong> Clear routes from the website and social profiles to the team, so interest turns into conversations.</li>
+                  </ul>
+                </div>
+                <dl class="dossier-spec">
+                  <div><dt>Services</dt><dd><ul class="dossier-tags"><li>Website development</li><li>Social media</li><li>Product showcase</li></ul></dd></div>
+                  <div><dt>Industry</dt><dd>Fabrics and textiles</dd></div>
+                  <div><dt>Focus</dt><dd>Brand awareness, fabric visibility and customer engagement</dd></div>
+                  <div><dt>See it live</dt><dd><ul class="dossier-links">
+                    <li><a href="https://sanjayudhyog.com/" target="_blank" rel="noopener">sanjayudhyog.com</a></li>
+                    <li><a href="https://www.instagram.com/sanjayudhyog/" target="_blank" rel="noopener">Instagram</a></li>
+                  </ul></dd></div>
+                </dl>
+              </div>
+              <p class="dossier-cta">Want your fabrics or products seen by more buyers? <a href="#contact">Start a project</a></p>
+            </div>
+          </dialog>
         </article>
         <article class="mission">
-          <p class="mission-kind">Finance software</p>
-          <h3>Ledgerly</h3>
-          <p class="mission-what">Product design and development</p>
-          <p class="mission-result">First version shipped in ten weeks.</p>
+          <p class="mission-kind">Corporate gifting store</p>
+          <h3>Silver Giftz</h3>
+          <p class="mission-what">E-commerce website design and development for corporate gifts and customised merchandise, with a professional online shopping experience.</p>
+          <div class="mission-actions">
+            <button class="about-btn" type="button" data-about="about-silvergiftz" aria-haspopup="dialog">About project <span class="pad" aria-hidden="true"></span></button>
+          </div>
+          <dialog class="dossier" id="about-silvergiftz" aria-labelledby="about-silvergiftz-title">
+            <div class="dossier-sheet">
+              <header class="dossier-head">
+                <p class="dossier-ref"><b>Project 04 / 07</b> · Corporate gifting store</p>
+                <h3 id="about-silvergiftz-title">Silver Giftz</h3>
+                <form method="dialog"><button class="dossier-close" type="submit">Close <span class="dossier-x" aria-hidden="true"></span></button></form>
+              </header>
+              <div class="dossier-body">
+                <div class="dossier-main">
+                  <p class="dossier-lede">Silver Giftz sells corporate gifts and customised merchandise. MDD Infotech designed and built its e-commerce website, so buyers can browse the range and shop online with the confidence they expect from a professional store.</p>
+                  <h4>What we did</h4>
+                  <ul class="dossier-list">
+                    <li><strong>Design.</strong> A clean, professional storefront that shows corporate gifts and custom merchandise at their best.</li>
+                    <li><strong>E-commerce development.</strong> A complete online store with product pages and a smooth shopping experience from browsing to checkout.</li>
+                  </ul>
+                </div>
+                <dl class="dossier-spec">
+                  <div><dt>Services</dt><dd><ul class="dossier-tags"><li>Website design</li><li>E-commerce development</li></ul></dd></div>
+                  <div><dt>Focus</dt><dd>A professional online shopping experience for corporate gifts</dd></div>
+                  <div><dt>See it live</dt><dd><ul class="dossier-links">
+                    <li><a href="https://silvergiftz.com/" target="_blank" rel="noopener">silvergiftz.com</a></li>
+                  </ul></dd></div>
+                </dl>
+              </div>
+              <p class="dossier-cta">Planning an online store? <a href="#contact">Start a project</a></p>
+            </div>
+          </dialog>
+        </article>
+        <article class="mission">
+          <p class="mission-kind">Bulk gifting store</p>
+          <h3>More Than Giftz</h3>
+          <p class="mission-what">A complete e-commerce website for corporate and bulk gifting: product catalogues, customised gifting, enquiry management and a smooth ordering process.</p>
+          <div class="mission-actions">
+            <button class="about-btn" type="button" data-about="about-morethangiftz" aria-haspopup="dialog">About project <span class="pad" aria-hidden="true"></span></button>
+          </div>
+          <dialog class="dossier" id="about-morethangiftz" aria-labelledby="about-morethangiftz-title">
+            <div class="dossier-sheet">
+              <header class="dossier-head">
+                <p class="dossier-ref"><b>Project 05 / 07</b> · Bulk gifting store</p>
+                <h3 id="about-morethangiftz-title">More Than Giftz</h3>
+                <form method="dialog"><button class="dossier-close" type="submit">Close <span class="dossier-x" aria-hidden="true"></span></button></form>
+              </header>
+              <div class="dossier-body">
+                <div class="dossier-main">
+                  <p class="dossier-lede">More Than Giftz serves companies that buy gifts in volume. MDD Infotech built a complete e-commerce website for corporate and bulk gifting, from browsing the catalogue to sending an enquiry and placing an order.</p>
+                  <h4>What we built</h4>
+                  <ul class="dossier-list">
+                    <li><strong>Product catalogues.</strong> The full range organised so corporate buyers can find the right gifts quickly.</li>
+                    <li><strong>Customised gifting.</strong> Room for personalised and branded gifting solutions, not just products off the shelf.</li>
+                    <li><strong>Enquiry management.</strong> Bulk and custom requests come in as structured enquiries the team can follow up.</li>
+                    <li><strong>Ordering.</strong> A smooth ordering process for corporate and bulk orders.</li>
+                  </ul>
+                </div>
+                <dl class="dossier-spec">
+                  <div><dt>Services</dt><dd><ul class="dossier-tags"><li>E-commerce development</li><li>Enquiry management</li></ul></dd></div>
+                  <div><dt>Focus</dt><dd>Corporate and bulk gifting, end to end</dd></div>
+                </dl>
+              </div>
+              <p class="dossier-cta">Selling to businesses in bulk? <a href="#contact">Start a project</a></p>
+            </div>
+          </dialog>
+        </article>
+        <article class="mission">
+          <p class="mission-kind">Link-in-bio platform</p>
+          <h3>Linkora</h3>
+          <p class="mission-what">A platform for personalised pages that bring all of someone’s social profiles and important links together behind a single URL.</p>
+          <div class="mission-actions">
+            <button class="about-btn" type="button" data-about="about-linkora" aria-haspopup="dialog">About project <span class="pad" aria-hidden="true"></span></button>
+          </div>
+          <dialog class="dossier" id="about-linkora" aria-labelledby="about-linkora-title">
+            <div class="dossier-sheet">
+              <header class="dossier-head">
+                <p class="dossier-ref"><b>Project 06 / 07</b> · Link-in-bio platform</p>
+                <h3 id="about-linkora-title">Linkora</h3>
+                <form method="dialog"><button class="dossier-close" type="submit">Close <span class="dossier-x" aria-hidden="true"></span></button></form>
+              </header>
+              <div class="dossier-body">
+                <div class="dossier-main">
+                  <p class="dossier-lede">Linkora is a link-in-bio platform. It gives anyone one personalised page that holds all their social profiles and important links, so a single URL in a bio leads people everywhere they need to go.</p>
+                  <h4>What we built</h4>
+                  <ul class="dossier-list">
+                    <li><strong>Personalised pages.</strong> Each user creates a page of their own and makes it look the way they want.</li>
+                    <li><strong>Social profiles in one place.</strong> Multiple social media profiles managed from one page.</li>
+                    <li><strong>One URL to share.</strong> Every important link shared through a single address.</li>
+                  </ul>
+                </div>
+                <dl class="dossier-spec">
+                  <div><dt>Services</dt><dd><ul class="dossier-tags"><li>Web platform</li><li>Product development</li></ul></dd></div>
+                  <div><dt>Focus</dt><dd>One link for creators, brands and professionals</dd></div>
+                  <div><dt>See it live</dt><dd><ul class="dossier-links">
+                    <li><a href="https://linkora.fwh.is/" target="_blank" rel="noopener">linkora.fwh.is</a></li>
+                  </ul></dd></div>
+                </dl>
+              </div>
+              <p class="dossier-cta">Have a platform idea of your own? <a href="#contact">Start a project</a></p>
+            </div>
+          </dialog>
+        </article>
+        <article class="mission">
+          <p class="mission-kind">Resume builder</p>
+          <h3>JD Resume</h3>
+          <p class="mission-what">An online resume builder with professional templates, ATS-friendly optimisation and tailoring to a job description, so job seekers get a resume that is ready to send.</p>
+          <div class="mission-actions">
+            <button class="about-btn" type="button" data-about="about-jdresume" aria-haspopup="dialog">About project <span class="pad" aria-hidden="true"></span></button>
+          </div>
+          <dialog class="dossier" id="about-jdresume" aria-labelledby="about-jdresume-title">
+            <div class="dossier-sheet">
+              <header class="dossier-head">
+                <p class="dossier-ref"><b>Project 07 / 07</b> · Resume builder</p>
+                <h3 id="about-jdresume-title">JD Resume</h3>
+                <form method="dialog"><button class="dossier-close" type="submit">Close <span class="dossier-x" aria-hidden="true"></span></button></form>
+              </header>
+              <div class="dossier-body">
+                <div class="dossier-main">
+                  <p class="dossier-lede">JD Resume is an online resume-building platform. It helps job seekers turn their experience into a professional, job-ready resume, shaped for the role they are applying to and for the applicant tracking systems that screen it first.</p>
+                  <h4>What we built</h4>
+                  <ul class="dossier-list">
+                    <li><strong>Professional templates.</strong> A choice of clean resume layouts that look right to recruiters.</li>
+                    <li><strong>ATS-friendly optimisation.</strong> Resumes structured so applicant tracking systems can read them.</li>
+                    <li><strong>Tailored to the job description.</strong> Customisation based on the job description, so each resume fits the role.</li>
+                  </ul>
+                </div>
+                <dl class="dossier-spec">
+                  <div><dt>Services</dt><dd><ul class="dossier-tags"><li>Web platform</li><li>Product development</li></ul></dd></div>
+                  <div><dt>Focus</dt><dd>Professional, job-ready resumes for job seekers</dd></div>
+                  <div><dt>See it live</dt><dd><ul class="dossier-links">
+                    <li><a href="https://jdresume.online" target="_blank" rel="noopener">jdresume.online</a></li>
+                  </ul></dd></div>
+                </dl>
+              </div>
+              <p class="dossier-cta">Want to build an online product? <a href="#contact">Start a project</a></p>
+            </div>
+          </dialog>
         </article>
       </div>
     </div>
