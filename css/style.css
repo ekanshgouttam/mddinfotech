@@ -578,9 +578,76 @@ html { scrollbar-gutter: stable; }
 .contact-address { margin-top: 26px; font-style: normal; line-height: 1.5; color: var(--steel); }
 .contact-address a { text-decoration: none; transition: color .3s; }
 .contact-address a:hover { color: var(--text); text-decoration: underline; text-underline-offset: .2em; }
-.contact-links { list-style: none; padding: 0; margin: 24px 0 0; display: flex; flex-wrap: wrap; gap: 8px 24px; }
-.contact-links a { color: var(--steel); text-underline-offset: .2em; transition: color .3s; }
-.contact-links a:hover { color: var(--text); }
+.contact-links { list-style: none; padding: 0; margin: 24px 0 0; display: flex; flex-wrap: wrap; gap: 12px 28px; }
+.contact-links a {
+  display: inline-flex; align-items: center; gap: 12px;
+  color: var(--steel); text-decoration: none; transition: color .3s;
+}
+.contact-links a:hover, .contact-links a:focus-visible { color: var(--text); }
+/* Social icons: each one is a small chip on the board. Pins on its sides, an orange signal running round its
+   edge, and a line drawing that draws itself in when the contact block prints, and again on hover. */
+.social-ico {
+  position: relative; display: grid; place-items: center; flex: none; width: 46px; height: 46px;
+  border: 1px solid rgba(205, 216, 240, .24); border-radius: 3px;
+  background:
+    linear-gradient(rgba(205, 216, 240, .06) 1px, transparent 1px) 0 0 / 100% 9px,
+    rgba(7, 11, 20, .6);
+  color: var(--text);
+  transition: border-color .35s, color .35s, background-color .35s, transform .45s var(--ease), box-shadow .45s;
+}
+/* the pins, three a side */
+.social-ico::before, .social-ico::after {
+  content: ""; position: absolute; top: 12px; bottom: 12px; width: 5px;
+  background: repeating-linear-gradient(to bottom, rgba(205, 216, 240, .4) 0 1.5px, transparent 1.5px 9px);
+  transition: background .35s;
+}
+.social-ico::before { left: -6px; }
+.social-ico::after { right: -6px; }
+
+.social-ico svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.social-ico svg [pathLength] { stroke-dasharray: 1; stroke-dashoffset: 0; }
+.social-ico .dot { fill: currentColor; stroke: none; transition: fill .35s; }
+
+/* the signal: a glowing dot that keeps running round the chip's edge */
+.ico-signal {
+  position: absolute; left: 0; top: 0; width: 5px; height: 5px; border-radius: 50%;
+  background: var(--orange); box-shadow: 0 0 8px 2px rgba(223, 104, 38, .75);
+  /* along the middle of the border; path coordinates start at the chip's inner (padding-box) corner */
+  offset-path: path("M-0.5,-0.5 H44.5 V44.5 H-0.5 Z"); offset-rotate: 0deg; offset-distance: 0%;
+  opacity: 0;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .ico-signal { opacity: 1; animation: ico-run 4.2s linear infinite; animation-delay: var(--d, 0s); }
+}
+@keyframes ico-run { to { offset-distance: 100%; } }
+
+/* the name gets a trace drawn under it on hover */
+.social-name {
+  padding-bottom: 3px;
+  background: linear-gradient(var(--orange), var(--orange)) left bottom / 0 1.5px no-repeat;
+  transition: background-size .45s var(--ease);
+}
+
+.contact-links a:hover .social-ico, .contact-links a:focus-visible .social-ico {
+  border-color: var(--orange); color: var(--orange-hot); background-color: rgba(223, 104, 38, .12);
+  transform: translateY(-3px); box-shadow: 0 8px 22px -6px rgba(223, 104, 38, .55);
+}
+.contact-links a:hover .social-ico::before, .contact-links a:hover .social-ico::after,
+.contact-links a:focus-visible .social-ico::before, .contact-links a:focus-visible .social-ico::after {
+  background: repeating-linear-gradient(to bottom, var(--orange) 0 1.5px, transparent 1.5px 9px);
+}
+.contact-links a:hover .social-name, .contact-links a:focus-visible .social-name { background-size: 100% 1.5px; }
+
+@media (prefers-reduced-motion: no-preference) {
+  /* drawn in when the contact block prints, one chip after another */
+  .contact-links.is-printed .social-ico svg [pathLength] { animation: ico-draw 1.1s var(--ease) both; animation-delay: calc(var(--i, 0) * .18s + .35s); }
+  .contact-links li:nth-child(2) { --i: 1; }
+  .contact-links li:nth-child(3) { --i: 2; }
+  /* and drawn again on hover, with the signal racing round */
+  .contact-links a:hover .social-ico svg [pathLength], .contact-links a:focus-visible .social-ico svg [pathLength] { animation: ico-draw .8s var(--ease) both; }
+  .contact-links a:hover .ico-signal, .contact-links a:focus-visible .ico-signal { animation-duration: 1.1s; }
+}
+@keyframes ico-draw { from { stroke-dashoffset: 1; } to { stroke-dashoffset: 0; } }
 @media (max-width: 760px) {
   .contact { padding-top: 30vh; }
   .panel-anchor { left: var(--gutter); right: var(--gutter); width: auto; top: 10vh; height: 15vh; translate: none; }
